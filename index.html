@@ -1,0 +1,2871 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Planificateur Complet 📅</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366F1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Planning">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📅</text></svg>">
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+               signOut, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect,
+               getRedirectResult, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+               sendPasswordResetEmail }
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+      import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection }
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyCnv0S78A8kK9vHHrzQKfYbX6NWM1UXRhs",
+        authDomain: "mon-planificateur-1e03c.firebaseapp.com",
+        projectId: "mon-planificateur-1e03c",
+        storageBucket: "mon-planificateur-1e03c.firebasestorage.app",
+        messagingSenderId: "978579425049",
+        appId: "1:978579425049:web:e53559ba2b80517c7c6788"
+      };
+
+      const app   = initializeApp(firebaseConfig);
+      const auth  = getAuth(app);
+      const db    = getFirestore(app);
+
+      // ── Expose to window for vanilla scripts ──────────────────────────────
+      const googleProvider = new GoogleAuthProvider();
+      // Use redirect (works on Safari, iOS, all browsers — no popup needed)
+      window._signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
+
+      window._fb = { auth, db, doc, setDoc, getDoc, onSnapshot, collection,
+                     sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+                     signOut, onAuthStateChanged,
+                     createUserWithEmailAndPassword, signInWithEmailAndPassword,
+                     sendPasswordResetEmail };
+
+      // ── Action URL for email link ─────────────────────────────────────────
+      const ACTION_URL = 'https://mysinglelise.github.io/monplanificateur/';
+
+      // ── Handle Google redirect result on page load ────────────────────────
+      getRedirectResult(auth)
+        .then(result => {
+          if (result && result.user) {
+            // Successfully signed in via Google redirect — onAuthStateChanged handles the rest
+            console.log('✅ Google redirect sign-in:', result.user.email);
+          }
+        })
+        .catch(e => {
+          if (e.code !== 'auth/no-current-user') {
+            console.error('Google redirect error:', e);
+            // Show error on login screen if visible
+            const errEl = document.getElementById('login-error');
+            if (errEl) { errEl.textContent = 'Erreur Google : ' + e.message; errEl.style.display = 'block'; }
+          }
+        });
+
+      // ── Handle email-link sign-in on page load ────────────────────────────
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        let email = window.localStorage.getItem('emailForSignIn');
+        if (!email) email = window.prompt('Confirme ton adresse email :');
+        signInWithEmailLink(auth, email, window.location.href)
+          .then(() => {
+            window.localStorage.removeItem('emailForSignIn');
+            window.history.replaceState({}, document.title, ACTION_URL);
+          })
+          .catch(e => alert('Erreur de connexion : ' + e.message));
+      }
+
+      // ── Auth state → show/hide login overlay ─────────────────────────────
+      onAuthStateChanged(auth, user => {
+        window._currentUser = user;
+        if (user) {
+          document.getElementById('login-overlay').style.display = 'none';
+          document.getElementById('app-container').style.display  = 'block';
+          document.getElementById('user-email-display').textContent = user.email;
+          window._initFirestoreSync(user.uid);
+        } else {
+          document.getElementById('login-overlay').style.display  = 'flex';
+          document.getElementById('app-container').style.display  = 'none';
+        }
+      });
+
+      // ── Send magic link ───────────────────────────────────────────────────
+      window._sendMagicLink = async (email) => {
+        const actionCodeSettings = { url: ACTION_URL, handleCodeInApp: true };
+        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+        window.localStorage.setItem('emailForSignIn', email);
+      };
+
+      window._signOut = () => signOut(auth);
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            letter-spacing: -0.01em;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        button {
+            font-weight: 600;
+        }
+
+       /* Post-its flottants */
+#postit-widget {
+    position: fixed;
+    top: 20px;
+    left: 40%;
+    width: 280px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    padding: 16px;
+    z-index: 9999;
+    transition: transform 0.3s ease;
+}
+#postit-widget.hidden {
+    transform: translateY(-120%);
+}
+#postit-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #4F46E5;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10000;
+}
+        .postit-item {
+            margin-bottom: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid;
+        }
+        .postit-item input, .postit-item textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: inherit;
+        }
+        .postit-item input {
+            font-weight: bold;
+            font-size: 14px;
+            border-bottom: 2px dashed currentColor;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+        .postit-item textarea {
+            font-size: 12px;
+            resize: none;
+            min-height: 60px;
+        }
+
+        
+        /* Bouton print */
+        #print-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #6366F1;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 10001;
+        }
+        #print-button:hover {
+            background: #4F46E5;
+        }
+        
+        /* Styles d'impression */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 15mm;
+            }
+            
+            /* Cacher les éléments d'interface */
+            #print-button,
+            #postit-toggle,
+            #postit-widget,
+            #cycle-toggle,
+            #cycle-panel,
+            #courses-toggle,
+            #courses-panel,
+            #modules-toggle,
+            #modules-panel,
+            #membres-toggle,
+            #membres-panel,
+            header,
+            nav,
+            button {
+                display: none !important;
+            }
+            
+            /* Optimiser pour l'impression */
+            body {
+                background: white !important;
+            }
+            
+            .bg-gradient-to-br {
+                background: white !important;
+            }
+            
+            /* Garder les couleurs importantes */
+            .bg-pink-50, .bg-pink-100, .bg-red-100, .bg-red-200,
+            .bg-yellow-50, .bg-yellow-100, .bg-slate-100, .bg-slate-200 {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
+<div id="login-overlay" style="display:flex; position:fixed; inset:0; z-index:99999;
+  background:linear-gradient(135deg,#6366F1 0%,#EC4899 100%);
+  align-items:center; justify-content:center; font-family:'Open Sans',sans-serif;
+  padding:16px; box-sizing:border-box;">
+  <div style="background:white; border-radius:24px; padding:32px 28px; width:100%; max-width:360px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center;">
+    <div style="font-size:44px; margin-bottom:8px;">📅</div>
+    <h1 style="margin:0 0 4px; font-size:20px; font-weight:800; color:#1e293b;">My Single Planning</h1>
+    <p style="margin:0 0 24px; color:#64748b; font-size:13px;">Connecte-toi pour accéder à ton planning</p>
+
+    <input id="pw-email" type="email" placeholder="ton@email.com"
+      style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e2e8f0;
+        border-radius:10px; font-size:14px; outline:none; margin-bottom:10px; font-family:inherit;"
+      onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='#e2e8f0'"
+      onkeypress="if(event.key==='Enter') document.getElementById('pw-password').focus()" />
+    <input id="pw-password" type="password" placeholder="Mot de passe (6 caractères min)"
+      style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e2e8f0;
+        border-radius:10px; font-size:14px; outline:none; margin-bottom:12px; font-family:inherit;"
+      onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='#e2e8f0'"
+      onkeypress="if(event.key==='Enter') window._doPasswordSignIn()" />
+    <button onclick="window._doPasswordSignIn()"
+      style="width:100%; padding:13px; background:#6366F1; color:white; border:none;
+        border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; margin-bottom:8px;">
+      Se connecter
+    </button>
+    <button onclick="window._doPasswordRegister()"
+      style="width:100%; padding:13px; background:white; color:#6366F1; border:2px solid #6366F1;
+        border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; margin-bottom:8px;">
+      Créer un compte
+    </button>
+    <button onclick="window._doForgotPassword()"
+      style="background:none; border:none; color:#94a3b8; font-size:12px; cursor:pointer;
+        font-family:inherit; text-decoration:underline;">
+      Mot de passe oublié ?
+    </button>
+
+    <p id="login-error" style="display:none; color:#ef4444; font-size:12px; margin-top:10px; text-align:left;"></p>
+  </div>
+</div>
+
+<!-- ═══════════════ APP (hidden until logged in) ═══════════════ -->
+<div id="app-container" style="display:none;">
+
+  <!-- User bar -->
+  <div id="user-bar" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:white; border-radius:50px; padding:8px 16px; box-shadow:0 4px 16px rgba(0,0,0,0.15);
+    z-index:10002; display:flex; align-items:center; gap:8px; font-size:12px; color:#64748b;
+    border:2px solid #e2e8f0; white-space:nowrap;">
+    <span>👤</span>
+    <span id="user-email-display" style="max-width:140px; overflow:hidden; text-overflow:ellipsis;"></span>
+    <span id="sync-indicator" style="color:#22c55e; font-size:16px;" title="Synchronisé">●</span>
+    <button onclick="window._exportData()" title="Sauvegarder mes données"
+      style="background:#f0fdf4; border:1px solid #86efac; color:#166534; padding:4px 10px;
+        border-radius:20px; cursor:pointer; font-size:11px; font-weight:600; font-family:inherit;">
+      💾
+    </button>
+    <button onclick="window._importData()" title="Restaurer mes données"
+      style="background:#eff6ff; border:1px solid #93c5fd; color:#1e40af; padding:4px 10px;
+        border-radius:20px; cursor:pointer; font-size:11px; font-weight:600; font-family:inherit;">
+      📂
+    </button>
+    <button onclick="window._signOut()"
+      style="background:#f1f5f9; border:none; color:#64748b; padding:4px 10px; border-radius:20px;
+        cursor:pointer; font-size:11px; font-weight:600; font-family:inherit;">
+      🚪
+    </button>
+  </div>
+
+
+
+
+    <!-- Bouton Print -->
+    <button id="print-button" onclick="window.print()" title="Imprimer">
+        🖨️
+    </button>
+
+    <!-- Bouton Modules -->
+    <button id="modules-toggle" onclick="toggleModulesPanel()"
+        style="position:fixed; top:70px; right:20px; background:#64748b; color:white; border:none;
+               padding:10px 15px; border-radius:8px; cursor:pointer; font-size:16px;
+               box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:10001;">
+        ⚙️
+    </button>
+
+    <!-- Panneau Modules -->
+    <div id="modules-panel" style="display:none; position:fixed; top:110px; right:20px; width:260px;
+        background:white; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,0.2);
+        padding:20px; z-index:10002; border:3px solid #64748b;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; color:#475569; font-weight:bold; font-size:16px;">⚙️ Mes modules</h3>
+            <button onclick="toggleModulesPanel()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#999;">×</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#334155;">
+                <input type="checkbox" id="mod-cycle" onchange="applyModules()" style="width:18px; height:18px; accent-color:#EC4899; cursor:pointer;">
+                <span>👁️🩸 Tracker de règles</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#334155;">
+                <input type="checkbox" id="mod-inter" onchange="applyModules()" style="width:18px; height:18px; accent-color:#8B5CF6; cursor:pointer;">
+                <span>💊 Intermittence</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#334155;">
+                <input type="checkbox" id="mod-courses" onchange="applyModules()" style="width:18px; height:18px; accent-color:#47ed79; cursor:pointer;">
+                <span>🛒 Courses</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#334155;">
+                <input type="checkbox" id="mod-postits" onchange="applyModules()" style="width:18px; height:18px; accent-color:#4F46E5; cursor:pointer;">
+                <span>📌 Post-its</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#334155;">
+                <input type="checkbox" id="mod-membres" onchange="applyModules()" style="width:18px; height:18px; accent-color:#F97316; cursor:pointer;">
+                <span>👥 Membres de la famille</span>
+            </label>
+        </div>
+        <p style="margin:14px 0 0; font-size:11px; color:#94a3b8; font-style:italic;">
+            Tes choix sont sauvegardés automatiquement.
+        </p>
+    </div>
+
+
+    <!-- Bouton Intermittence -->
+    <button id="intermittence-toggle" onclick="toggleIntermittencePanel()" style="position: fixed; top: 70px; left: 20px; background: #8B5CF6; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10001;">
+        💊
+    </button>
+    <div id="intermittence-panel" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 10000; border: 4px solid #8B5CF6; width: 420px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #8B5CF6; font-size: 24px; font-weight: bold;">📊 Mon Intermittence</h3>
+            <button onclick="toggleIntermittencePanel()" style="background: none; border: none; font-size: 32px; cursor: pointer; color: #999;">×</button>
+        </div>
+        <div id="intermittence-stats"></div>
+    </div>
+
+    <!-- Bouton Membres -->
+    <button id="membres-toggle" onclick="toggleMembresPanel()"
+        style="position:fixed; top:120px; left:20px; background:#F97316; color:white; border:none;
+               padding:10px 15px; border-radius:8px; cursor:pointer; font-size:16px;
+               box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:10001;">
+        👥
+    </button>
+
+    <!-- Panneau Membres -->
+    <div id="membres-panel" style="display:none; position:fixed; top:50%; left:50%;
+        transform:translate(-50%,-50%); background:white; padding:24px; border-radius:16px;
+        box-shadow:0 10px 40px rgba(0,0,0,0.3); z-index:10010; border:4px solid #F97316;
+        width:320px; max-height:80vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; color:#F97316; font-size:20px; font-weight:bold;">👥 Membres</h3>
+            <button onclick="toggleMembresPanel()" style="background:none; border:none; font-size:28px; cursor:pointer; color:#999;">×</button>
+        </div>
+        <div id="membres-list" style="margin-bottom:16px;"></div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <input id="membre-nom-input" type="text" placeholder="Prénom..."
+                style="flex:1; padding:8px 12px; border:2px solid #e2e8f0; border-radius:8px;
+                       font-size:14px; outline:none; font-family:inherit;"
+                onfocus="this.style.borderColor='#F97316'" onblur="this.style.borderColor='#e2e8f0'"
+                onkeypress="if(event.key==='Enter') addMembre()" />
+            <button onclick="addMembre()"
+                style="padding:8px 14px; background:#F97316; color:white; border:none;
+                       border-radius:8px; cursor:pointer; font-size:16px; font-weight:bold;">+</button>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
+            <span style="font-size:12px; color:#94a3b8; width:100%; margin-bottom:4px;">Couleur :</span>
+            <button onclick="selectMembreColor('#22c55e')" data-color="#22c55e" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#22c55e; border:3px solid transparent; cursor:pointer;"></button>
+            <button onclick="selectMembreColor('#3b82f6')" data-color="#3b82f6" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#3b82f6; border:3px solid transparent; cursor:pointer;"></button>
+            <button onclick="selectMembreColor('#8b5cf6')" data-color="#8b5cf6" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#8b5cf6; border:3px solid transparent; cursor:pointer;"></button>
+            <button onclick="selectMembreColor('#f97316')" data-color="#f97316" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#f97316; border:3px solid transparent; cursor:pointer;"></button>
+            <button onclick="selectMembreColor('#ec4899')" data-color="#ec4899" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#ec4899; border:3px solid transparent; cursor:pointer;"></button>
+            <button onclick="selectMembreColor('#92400e')" data-color="#92400e" class="color-btn"
+                style="width:28px; height:28px; border-radius:50%; background:#92400e; border:3px solid transparent; cursor:pointer;"></button>
+        </div>
+        <p style="margin:10px 0 0; font-size:11px; color:#94a3b8; font-style:italic;">
+            Écris le prénom dans un événement pour lui donner sa couleur.
+        </p>
+    </div>
+
+    <!-- Bouton Cycle -->
+    <button id="cycle-toggle" onclick="toggleCyclePanel()" style="position: fixed; top: 20px; left: 20px; background: #EC4899; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10001;">
+        👁️🩸
+    </button>
+
+    <!-- Panneau Cycle -->
+    <div id="cycle-panel" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 10000; border: 4px solid #EC4899; width: 400px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #EC4899; font-size: 24px; font-weight: bold;">📊 Mon Cycle</h3>
+            <button onclick="toggleCyclePanel()" style="background: none; border: none; font-size: 32px; cursor: pointer; color: #999;">×</button>
+        </div>
+        <div id="cycle-stats" style="font-size: 14px; color: #666;">
+            <p>Aucune donnée.</p>
+        </div>
+    </div>
+
+    <!-- Widget Post-its -->
+   <!-- Bouton toggle -->
+<button id="postit-toggle" onclick="togglePostits()">📌</button>
+
+<!-- Widget Post-its -->
+<div id="postit-widget" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; color: #4F46E5; font-weight: bold;">📌 Post-its</h3>
+            <button onclick="addPostit()" style="background: #4F46E5; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">+ Nouveau</button>
+        </div>
+        <div id="postit-container"></div>
+    </div>
+
+
+    <!-- ═══════════ Firestore Sync Engine ═══════════ -->
+    <script>
+    // ── Debounce helper ───────────────────────────────────────────────────────
+    function debounce(fn, ms) {
+        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+    }
+
+    // ── Sync indicator ────────────────────────────────────────────────────────
+    function setSyncing(v) {
+        const el = document.getElementById('sync-indicator');
+        if (!el) return;
+        el.textContent = v ? '⟳' : '●';
+        el.style.color  = v ? '#f59e0b' : '#22c55e';
+        el.title        = v ? 'Synchronisation...' : 'Synchronisé';
+    }
+
+    // ── Keys we sync to Firestore ─────────────────────────────────────────────
+    const SYNC_KEYS = ['plannerEvents','plannerTodos','customWeekData',
+                       'cycleData','interData','postits','coursesData','modulesConfig','membresData'];
+
+    // ── Firestore document ref for current user ───────────────────────────────
+    function userDocRef(uid) {
+        const { db, doc } = window._fb;
+        return doc(db, 'users', uid);
+    }
+
+    // ── Save ALL local state to Firestore (debounced 800ms) ───────────────────
+    window._pushToFirestore = debounce(async (uid) => {
+        window.dbg && window.dbg('📤 PUSH vers Firebase...', 'cyan');
+        setSyncing(true);
+        const data = {};
+        SYNC_KEYS.forEach(k => {
+            const v = localStorage.getItem(k);
+            if (v) data[k] = v;
+        });
+        try {
+            const { setDoc } = window._fb;
+            await setDoc(userDocRef(uid), data, { merge: true });
+            window.dbg && window.dbg('✅ Firebase sauvegardé !', 'lime');
+        } catch(e) { 
+            window.dbg && window.dbg('❌ Erreur Firebase: ' + e.message, 'red');
+            console.error('Firestore write error:', e); 
+        }
+        setSyncing(false);
+    }, 800);
+
+    // ── On login: load from Firestore, then start real-time listener ─────────
+    window._initFirestoreSync = async (uid) => {
+        const { getDoc, onSnapshot } = window._fb;
+        // 1. Load initial data
+        window.dbg && window.dbg('🔄 Chargement Firebase...', 'cyan');
+        try {
+            const snap = await getDoc(userDocRef(uid));
+            if (snap.exists()) {
+                const data = snap.data();
+                const keys = Object.keys(data);
+                window.dbg && window.dbg('📥 Données reçues: ' + keys.join(', '), 'lime');
+                // Ne charger que si localStorage est vide (React n'a pas encore de données)
+                const localEvents = localStorage.getItem('plannerEvents');
+                const localParsed = localEvents ? JSON.parse(localEvents) : {};
+                const localCount = Object.keys(localParsed).length;
+                window.dbg && window.dbg('📊 Local a ' + localCount + ' events, Firebase va charger', 'cyan');
+                // Charger Firebase dans localStorage SANS déclencher React via setItem patché
+                // On utilise _origSetItem pour ne pas déclencher de push
+                const orig = localStorage.__origSetItem || _origSetItem;
+                SYNC_KEYS.forEach(k => { if (data[k]) orig.call(localStorage, k, data[k]); });
+                window._reloadAllUI && window._reloadAllUI();
+            } else {
+                window.dbg && window.dbg('⚠️ Aucune donnée dans Firebase', 'orange');
+            }
+        } catch(e) { 
+            window.dbg && window.dbg('❌ Erreur lecture Firebase: ' + e.message, 'red');
+            console.error('Firestore read error:', e); 
+        }
+
+        // 2. Real-time listener for multi-device sync
+        onSnapshot(userDocRef(uid), (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            let changed = false;
+            SYNC_KEYS.forEach(k => {
+                if (data[k] && data[k] !== localStorage.getItem(k)) {
+                    localStorage.setItem(k, data[k]);
+                    changed = true;
+                }
+            });
+            if (changed) {
+                window._reloadAllUI && window._reloadAllUI();
+            }
+        });
+    };
+
+    // ── Monkey-patch localStorage.setItem to auto-push ───────────────────────
+    const _origSetItem = localStorage.setItem.bind(localStorage);
+    localStorage.__origSetItem = _origSetItem; // accessible depuis partout
+    localStorage.setItem = function(key, value) {
+        _origSetItem(key, value);
+        if (SYNC_KEYS.includes(key) && window._currentUser) {
+            window.dbg && window.dbg('💾 localStorage.setItem: ' + key, 'yellow');
+            window._pushToFirestore(window._currentUser.uid);
+        } else if (SYNC_KEYS.includes(key)) {
+            window.dbg && window.dbg('⚠️ setItem ' + key + ' mais PAS connecté!', 'orange');
+        }
+    };
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    window._showTab = (tab) => {
+        ['password','google','magic'].forEach(t => {
+            const panel = document.getElementById('panel-' + t);
+            const btn   = document.getElementById('tab-' + t);
+            if (!panel || !btn) return;
+            const active = t === tab;
+            panel.style.display = active ? 'block' : 'none';
+            btn.style.background = active ? '#6366F1' : 'transparent';
+            btn.style.color      = active ? 'white'   : '#64748b';
+        });
+        const errEl = document.getElementById('login-error');
+        if (errEl) errEl.style.display = 'none';
+    };
+    // Show password tab by default on load
+    document.addEventListener('DOMContentLoaded', () => window._showTab('password'));
+
+    // ── Email + Password ──────────────────────────────────────────────────────
+    window._doPasswordSignIn = async () => {
+        const email    = document.getElementById('pw-email').value.trim();
+        const password = document.getElementById('pw-password').value;
+        const errEl    = document.getElementById('login-error');
+        errEl.style.display = 'none';
+        if (!email || !password) { errEl.textContent = 'Remplis email et mot de passe.'; errEl.style.display = 'block'; return; }
+        try {
+            const { signInWithEmailAndPassword, auth } = window._fb;
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch(e) {
+            const msgs = {
+                'auth/user-not-found':   'Aucun compte avec cet email. Clique sur "Créer un compte".',
+                'auth/wrong-password':   'Mot de passe incorrect.',
+                'auth/invalid-email':    'Email invalide.',
+                'auth/too-many-requests':'Trop de tentatives. Réessaie dans quelques minutes.',
+                'auth/invalid-credential': 'Email ou mot de passe incorrect.',
+            };
+            errEl.textContent = msgs[e.code] || 'Erreur : ' + e.message;
+            errEl.style.display = 'block';
+        }
+    };
+
+    window._doPasswordRegister = async () => {
+        const email    = document.getElementById('pw-email').value.trim();
+        const password = document.getElementById('pw-password').value;
+        const errEl    = document.getElementById('login-error');
+        errEl.style.display = 'none';
+        if (!email) { errEl.textContent = 'Entre ton adresse email.'; errEl.style.display = 'block'; return; }
+        if (password.length < 6) { errEl.textContent = 'Le mot de passe doit faire au moins 6 caractères.'; errEl.style.display = 'block'; return; }
+        try {
+            const { createUserWithEmailAndPassword, auth } = window._fb;
+            await createUserWithEmailAndPassword(auth, email, password);
+        } catch(e) {
+            const msgs = {
+                'auth/email-already-in-use': 'Un compte existe déjà avec cet email. Connecte-toi !',
+                'auth/weak-password':        'Mot de passe trop faible (6 caractères minimum).',
+                'auth/invalid-email':        'Email invalide.',
+            };
+            errEl.textContent = msgs[e.code] || 'Erreur : ' + e.message;
+            errEl.style.display = 'block';
+        }
+    };
+
+    window._doForgotPassword = async () => {
+        const { sendPasswordResetEmail, auth } = window._fb;
+        const email = document.getElementById('pw-email').value.trim();
+        const errEl = document.getElementById('login-error');
+        if (!email) { errEl.textContent = 'Entre ton email ci-dessus puis clique "Mot de passe oublié".'; errEl.style.display = 'block'; return; }
+        try {
+            await sendPasswordResetEmail(auth, email);
+            errEl.style.color = '#22c55e';
+            errEl.textContent = '✅ Email de réinitialisation envoyé !';
+            errEl.style.display = 'block';
+            setTimeout(() => { errEl.style.color = '#ef4444'; errEl.style.display = 'none'; }, 4000);
+        } catch(e) {
+            errEl.style.color = '#ef4444';
+            errEl.textContent = 'Erreur : ' + e.message;
+            errEl.style.display = 'block';
+        }
+    };
+
+    // ── Google Sign-In handler ────────────────────────────────────────────────
+    window._doGoogleSignIn = async () => {
+        const errEl  = document.getElementById('login-error');
+        const btn    = document.getElementById('google-btn');
+        const btnTxt = document.getElementById('google-btn-text');
+        errEl.style.display = 'none';
+        if (btn)    { btn.disabled = true; btn.style.opacity = '0.7'; }
+        if (btnTxt) { btnTxt.textContent = 'Redirection vers Google…'; }
+        try {
+            await window._signInWithGoogle();
+        } catch(e) {
+            errEl.textContent = 'Erreur Google : ' + e.message;
+            errEl.style.display = 'block';
+            if (btn)    { btn.disabled = false; btn.style.opacity = '1'; }
+            if (btnTxt) { btnTxt.textContent = 'Continuer avec Google'; }
+        }
+    };
+
+    // ── Magic link send handler ───────────────────────────────────────────────
+    window._doSendLink = async () => {
+        const email = document.getElementById('login-email').value.trim();
+        const errEl = document.getElementById('login-error');
+        errEl.style.display = 'none';
+        if (!email || !email.includes('@')) {
+            errEl.textContent = 'Entre une adresse email valide.';
+            errEl.style.display = 'block'; return;
+        }
+        try {
+            await window._sendMagicLink(email);
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('login-sent').style.display = 'block';
+        } catch(e) {
+            errEl.textContent = 'Erreur : ' + e.message;
+            errEl.style.display = 'block';
+        }
+    };
+
+    // ── Reload all vanilla-JS UIs after Firestore sync ───────────────────────
+    window._reloadAllUI = () => {
+        // Post-its
+        try {
+            postits = JSON.parse(localStorage.getItem('postits') || '[]');
+            renderPostits();
+        } catch(e) {}
+        // Courses
+        try {
+            coursesData = JSON.parse(localStorage.getItem('coursesData') || '[]');
+            renderCourses();
+        } catch(e) {}
+        // Cycle
+        try {
+            cycleData = JSON.parse(localStorage.getItem('cycleData') || '[]');
+            window.cycleData = cycleData;
+            updateCycleStats();
+        } catch(e) {}
+        // Intermittence
+        try {
+            interData = JSON.parse(localStorage.getItem('interData') || '{"birthdate":"12-13","events":{}}');
+            window.interData = interData;
+        } catch(e) {}
+        // React (events + todos + customWeekData) — trigger re-render
+        try { window._reactReload && window._reactReload(); } catch(e) {}
+    };
+    </script>
+
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // ===== CONSTANTES =====
+        const DAYS = ['Samedi', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+        const WEEK_TYPES = ['Semaines 1 et 3', 'Semaine 2', 'Semaine 4'];
+        const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+        const COLORS = {
+            menage: 'bg-amber-100 border-amber-300 text-amber-900',
+            repas: 'bg-pink-100 border-pink-300 text-pink-900',
+            travail: 'bg-yellow-100 border-yellow-300 text-yellow-900',
+            sport: 'bg-blue-100 border-blue-300 text-blue-900',
+            sortie: 'bg-green-100 border-green-300 text-green-900',
+            emails: 'bg-gray-100 border-gray-300 text-gray-900',
+ecriture: 'bg-violet-100 border-violet-300 text-violet-900',
+        };
+
+        // ===== ICÔNES =====
+        const ChevronLeft = () => (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+);
+
+
+        const SettingsIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        );
+
+        const ArrowRightIcon = () => (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+        );
+
+
+        const ChevronRight = () => (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+        );
+
+        const CalendarIcon = () => (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        );
+
+        const CheckIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+        );
+
+        const PlusIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+        );
+
+        const TrashIcon = () => (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        );
+
+        // DONNEES SEMAINE 1 ET 3
+        const WEEK1_3 = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: [],
+            6: []
+        };
+// DONNEES SEMAINE 2
+        const WEEK2 = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: [],
+            6: []
+        };
+
+        // DONNEES SEMAINE 4
+        const WEEK4 = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: [],
+            6: []
+        };
+
+
+
+        // ===== FONCTIONS UTILITAIRES =====
+        const timeToMinutes = (time) => {
+            const [hours, minutes] = time.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+
+        const getWeekOfMonth = (date) => {
+            const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+            const dayOfMonth = date.getDate();
+            const firstDayOfWeek = firstDay.getDay();
+            return Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
+        };
+
+        const getDaysInMonth = (year, month) => {
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayOfWeek = firstDay.getDay();
+            
+            const days = [];
+            const prevMonthLastDay = new Date(year, month, 0).getDate();
+            for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+                days.push({
+                    day: prevMonthLastDay - i,
+                    isCurrentMonth: false,
+                    date: new Date(year, month - 1, prevMonthLastDay - i)
+                });
+            }
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                days.push({
+                    day: i,
+                    isCurrentMonth: true,
+                    date: new Date(year, month, i)
+                });
+            }
+            
+            const remainingDays = 42 - days.length;
+            for (let i = 1; i <= remainingDays; i++) {
+                days.push({
+                    day: i,
+                    isCurrentMonth: false,
+                    date: new Date(year, month + 1, i)
+                });
+            }
+            
+            return days;
+        };
+
+        const formatDate = (date) => {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${year}-${month}-${day}`;
+        };
+
+        const isSameDay = (date1, date2) => {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        };
+
+        const getWeekTypeFromDate = (date) => {
+            const weekNum = getWeekOfMonth(date);
+            if (weekNum === 1 || weekNum === 3) return 0;
+            if (weekNum === 2) return 1;
+            return 2;
+        };
+
+        const getDayIndex = (date) => {
+            const jsDay = date.getDay();
+            if (jsDay === 6) return 0;
+            return jsDay + 1;
+        };
+
+        // ===== COMPOSANT PRINCIPAL =====
+        function WeeklyPlanner() {
+            // États
+            const [viewMode, setViewMode] = useState('day');
+            const [currentDate, setCurrentDate] = useState(new Date());
+            const [currentDay, setCurrentDay] = useState(0);
+            const [currentWeekType, setCurrentWeekType] = useState(0);
+            const [events, setEvents] = useState({});
+            const [todos, setTodos] = useState({});
+            const [showEventModal, setShowEventModal] = useState(false);
+            const [showTodoInput, setShowTodoInput] = useState(false);
+            const [newEventText, setNewEventText] = useState('');
+            const [newTodoText, setNewTodoText] = useState('');
+            const [selectedDateForEvent, setSelectedDateForEvent] = useState(null);
+            const [showConfigModal, setShowConfigModal] = useState(false);
+            const [customWeekData, setCustomWeekData] = useState({});
+            const [configWeekType, setConfigWeekType] = useState(0);
+            const [configDay, setConfigDay] = useState(0);
+            const [editingTask, setEditingTask] = useState(null);
+            const [newTask, setNewTask] = useState({ start: '', end: '', task: '', category: 'travail' });
+            const [configHistory, setConfigHistory] = useState([]);
+            const [globalHistory, setGlobalHistory] = useState([]);
+
+            // Charger depuis localStorage
+            useEffect(() => {
+                const savedEvents = localStorage.getItem('plannerEvents');
+                const savedTodos = localStorage.getItem('plannerTodos');
+                if (savedEvents) setEvents(JSON.parse(savedEvents));
+                if (savedTodos) setTodos(JSON.parse(savedTodos));
+            }, []);
+
+            // Expose reload function for Firestore sync
+            useEffect(() => {
+                window._reactReload = () => {
+                    const savedEvents = localStorage.getItem('plannerEvents');
+                    const savedTodos = localStorage.getItem('plannerTodos');
+                    const savedCustom = localStorage.getItem('customWeekData');
+                    if (savedEvents) setEvents(JSON.parse(savedEvents));
+                    if (savedTodos) setTodos(JSON.parse(savedTodos));
+                    if (savedCustom) setCustomWeekData(JSON.parse(savedCustom));
+                };
+            }, []);
+
+            useEffect(() => {
+                window.dbg && window.dbg('⚛️ React sauvegarde events (nb: ' + Object.keys(events).length + ')', 'magenta');
+                localStorage.setItem('plannerEvents', JSON.stringify(events));
+            }, [events]);
+
+            useEffect(() => {
+                window.dbg && window.dbg('⚛️ React sauvegarde todos (nb: ' + Object.keys(todos).length + ')', 'magenta');
+                localStorage.setItem('plannerTodos', JSON.stringify(todos));
+            }, [todos]);
+
+            useEffect(() => {
+                const weekType = getWeekTypeFromDate(currentDate);
+                const dayIndex = getDayIndex(currentDate);
+                setCurrentWeekType(weekType);
+                setCurrentDay(dayIndex);
+            }, [currentDate]);
+
+            // Charger les données personnalisées
+            useEffect(() => {
+                const savedCustomData = localStorage.getItem('customWeekData');
+                if (savedCustomData) {
+                    setCustomWeekData(JSON.parse(savedCustomData));
+                }
+            }, []);
+
+            // Sauvegarder les données personnalisées
+            useEffect(() => {
+                if (Object.keys(customWeekData).length > 0) {
+                    localStorage.setItem('customWeekData', JSON.stringify(customWeekData));
+                }
+            }, [customWeekData]);
+
+            // Navigation
+            const goToPreviousDay = () => {
+                const newDate = new Date(currentDate);
+                newDate.setDate(newDate.getDate() - 1);
+                setCurrentDate(newDate);
+            };
+
+            const goToNextDay = () => {
+                const newDate = new Date(currentDate);
+                newDate.setDate(newDate.getDate() + 1);
+                setCurrentDate(newDate);
+            };
+
+            const goToToday = () => {
+                setCurrentDate(new Date());
+            };
+
+            const goToPreviousMonth = () => {
+                setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+            };
+
+            const goToNextMonth = () => {
+                setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+            };
+
+            const goToPreviousYear = () => {
+                setCurrentDate(new Date(currentDate.getFullYear() - 1, 0, 1));
+            };
+
+            const goToNextYear = () => {
+                setCurrentDate(new Date(currentDate.getFullYear() + 1, 0, 1));
+            };
+
+            // Gestion des événements
+            const addEvent = (dateStr, eventText) => {
+                if (!eventText.trim()) return;
+                saveStateToHistory();
+                const newEvents = { ...events };
+                
+                // Vérifier si c'est un événement annuel [AN]
+                if (eventText.includes('[AN]') || eventText.trim().endsWith(' AN') || eventText.trim().endsWith('AN')) {
+                    const currentDate = new Date(dateStr);
+                    const month = currentDate.getMonth();
+                    const day = currentDate.getDate();
+                    
+                    // Créer pour les 10 prochaines années
+                    for (let i = 0; i < 10; i++) {
+                        const year = currentDate.getFullYear() + i;
+                        const yearDate = new Date(year, month, day);
+                        const yearDateStr = formatDate(yearDate);
+                        
+                        if (!newEvents[yearDateStr]) newEvents[yearDateStr] = [];
+                        newEvents[yearDateStr].push({
+                            id: Date.now() + i,
+                            text: eventText,
+                            created: new Date().toISOString(),
+                            isAnnual: true
+                        });
+                    }
+                } else {
+                    // Événement normal
+                    if (!newEvents[dateStr]) newEvents[dateStr] = [];
+                    const evt = {
+                        id: Date.now(),
+                        text: eventText,
+                        created: new Date().toISOString()
+                    };
+                    newEvents[dateStr].push(evt);
+                    
+                    // Détecter intermittence
+                    const lower = eventText.toLowerCase();
+                    const CACHET_KEYWORDS = ['concert', 'tournage', 'action culturelle', 'repetitionp', 'enregistrement studio', 'atelier'];
+                    const isOption = lower.includes('option');
+                    const isCachet = !isOption && CACHET_KEYWORDS.some(k => lower.includes(k));
+                    if (isCachet) window.interHelper?.add(evt.id, dateStr, 'cachet');
+                    else if (isOption) window.interHelper?.add(evt.id, dateStr, 'option');
+                }
+                
+                setEvents(newEvents);
+                setNewEventText('');
+                setShowEventModal(false);
+            };
+
+            const deleteEvent = (dateStr, eventId) => {
+                saveStateToHistory();
+                const newEvents = { ...events };
+                if (newEvents[dateStr]) {
+                    // Vérifier si c'était un concert/option avant de supprimer
+                    const evt = newEvents[dateStr].find(e => e.id === eventId);
+                    if (evt) {
+                        const lower = evt.text.toLowerCase();
+                        const CACHET_KEYWORDS = ['concert', 'tournage', 'action culturelle', 'repetitionp', 'enregistrement studio', 'atelier'];
+                        if (lower.includes('option') || CACHET_KEYWORDS.some(k => lower.includes(k))) {
+                            window.interHelper?.remove(eventId);
+                        }
+                    }
+                    newEvents[dateStr] = newEvents[dateStr].filter(e => e.id !== eventId);
+                    if (newEvents[dateStr].length === 0) delete newEvents[dateStr];
+                }
+                setEvents(newEvents);
+            };
+
+            // Gestion des to-dos
+            const addTodo = (dateStr, todoText) => {
+                if (!todoText.trim()) return;
+                saveStateToHistory();
+                const newTodos = { ...todos };
+                if (!newTodos[dateStr]) newTodos[dateStr] = [];
+                newTodos[dateStr].push({
+                    id: Date.now(),
+                    text: todoText,
+                    completed: false,
+                    created: new Date().toISOString()
+                });
+                setTodos(newTodos);
+                setNewTodoText('');
+                setShowTodoInput(false);
+            };
+
+            const toggleTodo = (dateStr, todoId) => {
+                saveStateToHistory();
+                const newTodos = { ...todos };
+                if (newTodos[dateStr]) {
+                    const todo = newTodos[dateStr].find(t => t.id === todoId);
+                    if (todo) todo.completed = !todo.completed;
+                }
+                setTodos(newTodos);
+            };
+
+            const deleteTodo = (dateStr, todoId) => {
+                saveStateToHistory();
+                const newTodos = { ...todos };
+                if (newTodos[dateStr]) {
+                    newTodos[dateStr] = newTodos[dateStr].filter(t => t.id !== todoId);
+                    if (newTodos[dateStr].length === 0) delete newTodos[dateStr];
+                }
+                setTodos(newTodos);
+            };
+
+
+
+            // Reporter une to-do au lendemain
+            const reportTodoToTomorrow = (dateStr, todoId) => {
+                saveStateToHistory();
+                const newTodos = { ...todos };
+                if (!newTodos[dateStr]) return;
+                
+                const todo = newTodos[dateStr].find(t => t.id === todoId);
+                if (!todo || todo.completed) return;
+                
+                // Calculer la date de demain
+                const currentDateObj = new Date(dateStr);
+                currentDateObj.setDate(currentDateObj.getDate() + 1);
+                const tomorrowStr = formatDate(currentDateObj);
+                
+                // Créer ou récupérer la liste de demain
+                if (!newTodos[tomorrowStr]) newTodos[tomorrowStr] = [];
+                
+                // Ajouter la to-do à demain
+                newTodos[tomorrowStr].push({
+                    ...todo,
+                    id: Date.now(),
+                    created: new Date().toISOString()
+                });
+                
+                // Supprimer de aujourd'hui
+                newTodos[dateStr] = newTodos[dateStr].filter(t => t.id !== todoId);
+                if (newTodos[dateStr].length === 0) delete newTodos[dateStr];
+                
+                setTodos(newTodos);
+            };
+
+            // Reporter TOUTES les to-dos non cochées au lendemain
+            const reportAllTodosToTomorrow = (dateStr) => {
+                saveStateToHistory();
+                const newTodos = { ...todos };
+                if (!newTodos[dateStr]) return;
+                
+                const uncompletedTodos = newTodos[dateStr].filter(t => !t.completed);
+                if (uncompletedTodos.length === 0) return;
+                
+                // Calculer la date de demain
+                const currentDateObj = new Date(dateStr);
+                currentDateObj.setDate(currentDateObj.getDate() + 1);
+                const tomorrowStr = formatDate(currentDateObj);
+                
+                // Créer ou récupérer la liste de demain
+                if (!newTodos[tomorrowStr]) newTodos[tomorrowStr] = [];
+                
+                // Ajouter toutes les to-dos non cochées à demain
+                uncompletedTodos.forEach(todo => {
+                    newTodos[tomorrowStr].push({
+                        ...todo,
+                        id: Date.now() + Math.random(), // ID unique
+                        created: new Date().toISOString()
+                    });
+                });
+                
+                // Garder seulement les to-dos cochées aujourd'hui
+                newTodos[dateStr] = newTodos[dateStr].filter(t => t.completed);
+                if (newTodos[dateStr].length === 0) delete newTodos[dateStr];
+                
+                setTodos(newTodos);
+            };
+
+
+
+
+
+            // Annuler la dernière action (Ctrl+Z)
+            const undoLastAction = () => {
+                if (configHistory.length === 0) return;
+                
+                const previousState = configHistory[configHistory.length - 1];
+                setCustomWeekData(previousState);
+                setConfigHistory(configHistory.slice(0, -1));
+            };
+
+
+
+            // Sauvegarder l'état global pour Ctrl+Z universel
+            const saveStateToHistory = () => {
+                setGlobalHistory([...globalHistory, {
+                    todos: { ...todos },
+                    events: { ...events },
+                    customWeekData: { ...customWeekData }
+                }]);
+            };
+
+            // Annuler la dernière action globale (Ctrl+Z universel)
+            const undoGlobalAction = () => {
+                if (globalHistory.length === 0) return;
+                
+                const previousState = globalHistory[globalHistory.length - 1];
+                setTodos(previousState.todos);
+                setEvents(previousState.events);
+                setCustomWeekData(previousState.customWeekData);
+                setGlobalHistory(globalHistory.slice(0, -1));
+            };
+
+            // Écouter Ctrl+Z
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                        e.preventDefault();
+                        if (showConfigModal) {
+                            undoLastAction();
+                        } else {
+                            undoGlobalAction();
+                        }
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [configHistory, globalHistory, showConfigModal]);
+
+            // Obtenir les tâches (personnalisées ou par défaut)
+            const getTasksForConfig = (weekType, day) => {
+                const key = `${weekType}-${day}`;
+                if (customWeekData[key]) {
+                    return customWeekData[key];
+                }
+                // Retourner les données par défaut
+                const weekData = weekType === 0 ? WEEK1_3 : weekType === 1 ? WEEK2 : WEEK4;
+                return weekData[day] || [];
+            };
+
+            // Ajouter une tâche personnalisée
+            const addCustomTask = () => {
+                if (!newTask.start || !newTask.end || !newTask.task) return;
+                
+                const key = `${configWeekType}-${configDay}`;
+                const currentTasks = getTasksForConfig(configWeekType, configDay);
+                
+                // Sauvegarder l'état actuel pour Ctrl+Z
+                setConfigHistory([...configHistory, { ...customWeekData }]);
+                
+                // Ajouter la nouvelle tâche et trier par heure de début
+                const updatedTasks = [...currentTasks, { ...newTask }].sort((a, b) => {
+                    return timeToMinutes(a.start) - timeToMinutes(b.start);
+                });
+                
+                setCustomWeekData({
+                    ...customWeekData,
+                    [key]: updatedTasks
+                });
+                
+                setNewTask({ start: '', end: '', task: '', category: 'travail' });
+            };
+
+            // Modifier une tâche
+            const updateCustomTask = (index, updatedTask) => {
+                const key = `${configWeekType}-${configDay}`;
+                const currentTasks = getTasksForConfig(configWeekType, configDay);
+                
+                // Sauvegarder l'état actuel pour Ctrl+Z
+                setConfigHistory([...configHistory, { ...customWeekData }]);
+                
+                const updatedTasks = [...currentTasks];
+                updatedTasks[index] = updatedTask;
+                
+                // Trier après modification
+                updatedTasks.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+                
+                setCustomWeekData({
+                    ...customWeekData,
+                    [key]: updatedTasks
+                });
+                
+                setEditingTask(null);
+            };
+
+            // Supprimer une tâche
+            const deleteCustomTask = (index) => {
+                const key = `${configWeekType}-${configDay}`;
+                const currentTasks = getTasksForConfig(configWeekType, configDay);
+                
+                // Sauvegarder l'état actuel pour Ctrl+Z
+                setConfigHistory([...configHistory, { ...customWeekData }]);
+                
+                const updatedTasks = currentTasks.filter((_, i) => i !== index);
+                
+                setCustomWeekData({
+                    ...customWeekData,
+                    [key]: updatedTasks
+                });
+            };
+
+            // Réinitialiser au planning par défaut
+            const resetToDefault = () => {
+                if (confirm('Voulez-vous vraiment revenir au planning par défaut ? Toutes vos modifications seront perdues.')) {
+                    setCustomWeekData({});
+                    localStorage.removeItem('customWeekData');
+                }
+            };
+
+            // Obtenir les données
+            const getCurrentTasks = () => {
+                // Vérifier si des données personnalisées existent
+                const key = `${currentWeekType}-${currentDay}`;
+                if (customWeekData[key]) {
+                    return customWeekData[key];
+                }
+                // Sinon, utiliser les données par défaut
+                const weekData = currentWeekType === 0 ? WEEK1_3 : currentWeekType === 1 ? WEEK2 : WEEK4;
+                return weekData[currentDay] || [];
+            };
+
+            const getEventsForDate = (date) => {
+                const dateStr = formatDate(date);
+                return events[dateStr] || [];
+            };
+
+            const getTodosForDate = (date) => {
+                const dateStr = formatDate(date);
+                return todos[dateStr] || [];
+            };
+
+
+            // ===== RENDU DE LA VUE JOUR =====
+            const renderDaySchedule = () => {
+    const tasks = getCurrentTasks();
+    const currentDateStr = formatDate(currentDate);
+    const dayEvents = getEventsForDate(currentDate);
+    const dayTodos = getTodosForDate(currentDate);
+    
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-2">
+                <h3 className="text-lg font-bold text-indigo-600 mb-3">Planning horaire</h3>
+                {tasks.length > 0 ? tasks.map((task, idx) => {
+                    const startMin = timeToMinutes(task.start);
+                    const endMin = timeToMinutes(task.end);
+                    const duration = endMin - startMin;
+                    const heightPx = Math.max((duration / 30) * 40, 40);
+                    
+                    return (
+                        <div
+                            key={idx}
+                            className={`${COLORS[task.category]} rounded-lg p-3 border-l-4 transition-all hover:shadow-md`}
+                            style={{ minHeight: `${heightPx}px` }}
+                        >
+                            <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                    <div className="font-bold text-sm opacity-70">
+                                        {task.start} - {task.end}
+                                    </div>
+                                    <div className="font-semibold mt-1 leading-tight">
+                                        {task.task}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }) : (
+                    <p className="text-slate-400 italic text-center py-8">Aucune tâche planifiée</p>
+                )}
+            </div>
+
+            <div className="space-y-6">
+                <div className="bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-bold text-purple-700">Événements</h3>
+                        <button
+                            onClick={() => {
+                                setSelectedDateForEvent(currentDate);
+                                setShowEventModal(true);
+                            }}
+                            className="p-1 bg-purple-500 text-slate-800 rounded-full hover:bg-purple-600 transition-colors"
+                        >
+                            <PlusIcon />
+                        </button>
+                    </div>
+                    
+                    {dayEvents.length > 0 ? (
+                        <div className="space-y-2">
+                            {dayEvents.map(event => (
+                                <div key={event.id} className="bg-white rounded p-2 flex justify-between items-start group"
+                                    style={(() => {
+                                        const mc = window.getMemberColor?.(event.text);
+                                        return mc ? { borderLeft: `4px solid ${mc}`, paddingLeft: '8px' } : {};
+                                    })()}>
+                                    {/* MODIFICATION ICI : Ajout de la condition pour le vert sur "option de date" */}
+                                    <span className={`text-sm font-semibold ${
+    event.text.toLowerCase().includes('option') 
+    ? 'text-green-600' 
+    : (!event.text.toLowerCase().includes('option') && ['concert','tournage','action culturelle','repetitionp','enregistrement studio','atelier'].some(k => event.text.toLowerCase().includes(k))) 
+        ? 'text-red-600' 
+        : 'text-purple-900'
+}`}
+                                        style={(() => {
+                                            const mc = window.getMemberColor?.(event.text);
+                                            return mc ? { color: mc } : {};
+                                        })()}>
+                                        {event.text}
+                                    </span>
+                                    <button
+                                        onClick={() => deleteEvent(currentDateStr, event.id)}
+                                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                                    >
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-purple-600 italic">Aucun événement</p>
+                    )}
+                </div>
+
+                <div className="bg-indigo-50 rounded-lg p-4 border-2 border-indigo-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-bold text-indigo-700">To-Do</h3>
+                        <div className="flex gap-2">
+                            {dayTodos.filter(t => !t.completed).length > 0 && (
+                                <button
+                                    onClick={() => reportAllTodosToTomorrow(currentDateStr)}
+                                    className="px-3 py-1 bg-orange-500 text-slate-800 text-xs rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-1"
+                                    title="Reporter toutes les tâches non terminées au lendemain"
+                                >
+                                    <ArrowRightIcon />
+                                    <span>Demain</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowTodoInput(true)}
+                                className="p-1 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors"
+                            >
+                                <PlusIcon />
+                            </button>
+                        </div>
+                    </div>
+
+                    {showTodoInput && (
+                        <div className="mb-3 flex gap-2">
+                            <input
+                                type="text"
+                                value={newTodoText}
+                                onChange={(e) => setNewTodoText(e.target.value)}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') addTodo(currentDateStr, newTodoText);
+                                }}
+                                placeholder="Nouvelle tâche..."
+                                className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                autoFocus
+                            />
+                            <button
+                                onClick={() => addTodo(currentDateStr, newTodoText)}
+                                className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    )}
+                    
+                    {dayTodos.length > 0 ? (
+                        <div className="space-y-2">
+                            {dayTodos.map(todo => (
+                                <div key={todo.id} className="bg-white rounded p-2 flex items-center gap-2 group">
+                                    <button
+                                        onClick={() => toggleTodo(currentDateStr, todo.id)}
+                                        className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                            todo.completed 
+                                                ? 'bg-indigo-500 border-indigo-500 text-slate-800' 
+                                                : 'border-indigo-300 hover:border-indigo-500'
+                                        }`}
+                                    >
+                                        {todo.completed && <CheckIcon />}
+                                    </button>
+                                    <span className={`flex-1 text-sm ${todo.completed ? 'line-through text-slate-400' : 'text-indigo-900'}`}>
+                                        {todo.text}
+                                    </span>
+                                    {!todo.completed && (
+                                        <button
+                                            onClick={() => reportTodoToTomorrow(currentDateStr, todo.id)}
+                                            className="opacity-0 group-hover:opacity-100 text-orange-500 hover:text-orange-700 transition-opacity"
+                                            title="Reporter au lendemain"
+                                        >
+                                            <ArrowRightIcon />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => deleteTodo(currentDateStr, todo.id)}
+                                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                                    >
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-indigo-600 italic">Aucune tâche</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+            // ===== RENDU DE LA VUE SEMAINE =====
+            const renderWeekView = () => {
+                return (
+                    <div>
+                        <h2 className="text-3xl font-bold text-indigo-600 mb-6">Vue de la semaine</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {DAYS.map((day, idx) => {
+                                // Utiliser getTasksForConfig pour obtenir les données personnalisées ou par défaut
+                                const tasks = getTasksForConfig(currentWeekType, idx);
+                                return (
+                                    <div key={idx} className="border-2 border-slate-200 rounded-lg p-4 hover:border-indigo-300 transition-colors">
+                                        <h3 className="text-xl font-bold text-indigo-600 mb-3">{day}</h3>
+                                        <div className="space-y-1">
+                                            {tasks && tasks.length > 0 ? tasks.map((task, taskIdx) => {
+                                                const startMin = timeToMinutes(task.start);
+                                                const endMin = timeToMinutes(task.end);
+                                                const duration = endMin - startMin;
+                                                const heightPx = Math.max((duration / 30) * 25, 30);
+                                                
+                                                return (
+                                                    <div
+                                                        key={taskIdx}
+                                                        className={`${COLORS[task.category]} rounded p-2 border-l-2 text-xs`}
+                                                        style={{ minHeight: `${heightPx}px` }}
+                                                    >
+                                                        <div className="font-bold opacity-70">{task.start}</div>
+                                                        <div className="font-semibold leading-tight">{task.task}</div>
+                                                    </div>
+                                                );
+                                            }) : (
+                                                <p className="text-slate-400 text-sm italic">Aucune tâche</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+
+            // ===== RENDU DE LA VUE MOIS =====
+            const openCycleMenu = (dateStr) => {
+                const choice = prompt('🔴 Marquer vos règles :\n1 = Flux léger\n2 = Flux moyen\n3 = Flux fort\n0 = Retirer');
+                if (choice === '1' || choice === '2' || choice === '3') {
+                    const cramps = confirm('Des crampes ? ⚡️');
+                    window.cycleHelper.add(dateStr, parseInt(choice), cramps);
+                } else if (choice === '0') {
+                    window.cycleHelper.remove(dateStr);
+                }
+                if (choice !== null) {
+                    const temp = new Date(currentDate);
+                    temp.setMonth(currentDate.getMonth() + 1);
+                    setCurrentDate(temp);
+                    setTimeout(() => setCurrentDate(new Date(currentDate)), 10);
+                }
+            };
+
+            const renderMonthView = () => {
+                const days = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
+                
+                return (
+                    <div>
+                        <div className="grid grid-cols-7 gap-2 mb-2">
+                            {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
+                                <div key={day} className="text-center font-bold text-slate-600 py-2">{day}</div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                            {days.map((dayInfo, idx) => {
+                                const dayEvents = getEventsForDate(dayInfo.date);
+                                const dayTodos = getTodosForDate(dayInfo.date);
+                                const isToday = isSameDay(dayInfo.date, new Date());
+                                const hasContent = dayEvents.length > 0 || dayTodos.length > 0;
+                                
+                                return (
+                                    <button
+                                        key={idx}
+                                        onClick={() => {
+                                            setCurrentDate(dayInfo.date);
+                                            setViewMode('day');
+                                        }}
+                                        onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            openCycleMenu(formatDate(dayInfo.date));
+                                        }}
+                                        onTouchStart={(e) => {
+                                            const dateStr = formatDate(dayInfo.date);
+                                            window._longPressTimer = setTimeout(() => {
+                                                e.preventDefault();
+                                                openCycleMenu(dateStr);
+                                            }, 600);
+                                        }}
+                                        onTouchEnd={() => clearTimeout(window._longPressTimer)}
+                                        onTouchMove={() => clearTimeout(window._longPressTimer)}
+                                        className={`
+                                            relative min-h-24 p-2 rounded-lg border-2 transition-all hover:shadow-lg
+                                            ${(() => {
+                                                const isFertile = window.cycleHelper?.isFertile?.(dayInfo.date);
+                                                const isFullMoonDay = window.moonHelper?.isFull?.(dayInfo.date);
+                                                const isNewMoonDay = window.moonHelper?.isNew?.(dayInfo.date);
+                                                if (isNewMoonDay) return 'bg-slate-100';
+                                                if (isFullMoonDay) return 'bg-yellow-50';
+                                                if (isFertile) return 'bg-pink-50';
+                                                return dayInfo.isCurrentMonth ? 'bg-white' : 'bg-slate-50';
+                                            })()} 
+                                            ${dayInfo.isCurrentMonth ? 'border-slate-200' : 'border-slate-100'}
+                                            ${isToday ? 'ring-4 ring-indigo-300' : ''}
+                                            ${hasContent ? 'border-purple-300' : ''}
+                                        `}
+                                    >
+                                        <div className={`text-sm font-bold ${
+                                            dayInfo.isCurrentMonth ? 'text-slate-800' : 'text-slate-400'
+                                        } ${isToday ? 'text-indigo-600' : ''}`}>
+                                            {dayInfo.day}
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1 mt-1">
+                                            {(() => {
+                                                const dateStr = formatDate(dayInfo.date);
+                                                const cycleDay = window.cycleData?.find(d => d.date === dateStr);
+                                                const ovulation = window.cycleHelper?.getOvulation?.();
+                                                const isOvulation = ovulation && dateStr === formatDate(ovulation);
+                                                const isFullMoonDay = window.moonHelper?.isFull?.(dayInfo.date);
+                                                const isNewMoonDay = window.moonHelper?.isNew?.(dayInfo.date);
+                                                return (
+                                                    <>
+                                                        {cycleDay && <div className="text-xs flex items-center gap-0.5">
+                                                            {cycleDay.flow === 1 && '🔴'}
+                                                            {cycleDay.flow === 2 && '🔴🔴'}
+                                                            {cycleDay.flow === 3 && '🔴🔴🔴'}
+                                                            {cycleDay.cramps && '⚡️'}
+                                                        </div>}
+                                                        {isOvulation && <div className="text-base">🥚</div>}
+                                                        {isFullMoonDay && <div className="text-base">🌕</div>}
+                                                        {isNewMoonDay && <div className="text-base">🌑</div>}
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                        
+                                        {hasContent && (
+                                            <div className="mt-1 space-y-1">
+                                                {dayEvents.slice(0, 2).map(event => {
+                                                    const lower = event.text.toLowerCase();
+                                                    const CACHET_KW = ['concert','tournage','action culturelle','repetitionp','enregistrement studio','atelier'];
+                                                    const isOption = lower.includes('option');
+                                                    const isConcert = !isOption && CACHET_KW.some(k => lower.includes(k));
+                                                    const interEvt = window.interHelper?.get(event.id);
+                                                    const counted = interEvt?.counted ?? false;
+                                                    
+                                                    const memberColor = window.getMemberColor?.(event.text);
+                                                    return (
+                                                        <div key={event.id} className={`text-xs rounded px-1 truncate font-semibold flex items-center gap-1 ${
+                                                            isOption ? 'bg-green-100 text-green-700' :
+                                                            isConcert ? 'bg-red-100 text-red-700' : 
+                                                            'bg-purple-100 text-purple-700'
+                                                        }`}
+                                                        style={memberColor ? { background: memberColor + '22', color: memberColor, borderLeft: `3px solid ${memberColor}` } : {}}>
+                                                            <span className="flex-1">{event.text}</span>
+                                                            {isConcert && (
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        window.interHelper?.toggle(event.id);
+                                                                        setEvents({...events});
+                                                                    }}
+                                                                    className="hover:scale-110"
+                                                                    style={{opacity: counted ? 1 : 0.3}}
+                                                                >
+                                                                    💊
+                                                                </button>
+                                                            )}
+                                                            {isOption && (
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        window.interHelper?.toggle(event.id);
+                                                                        setEvents({...events});
+                                                                    }}
+                                                                    className="hover:scale-110"
+                                                                    style={{opacity: counted ? 1 : 0.3}}
+                                                                >
+                                                                    🤞🏼
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                                {dayTodos.filter(t => !t.completed).slice(0, 2).map(todo => (
+                                                    <div key={todo.id} className="text-xs bg-indigo-100 text-indigo-700 rounded px-1 truncate">
+                                                        • {todo.text}
+                                                    </div>
+                                                ))}
+                                                {(dayEvents.length + dayTodos.length > 2) && (
+                                                    <div className="text-xs text-slate-500">+{dayEvents.length + dayTodos.length - 2}</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            // ===== RENDU DE LA VUE ANNÉE =====
+            const renderYearView = () => {
+                const year = currentDate.getFullYear();
+                
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {MONTHS.map((monthName, monthIdx) => {
+                            const monthDate = new Date(year, monthIdx, 1);
+                            const days = getDaysInMonth(year, monthIdx);
+                            
+                            return (
+                                <div key={monthIdx} className="bg-white rounded-lg border-2 border-slate-200 p-3">
+                                    <button
+                                        onClick={() => {
+                                            setCurrentDate(monthDate);
+                                            setViewMode('month');
+                                        }}
+                                        className="text-lg font-bold text-indigo-600 mb-2 hover:text-indigo-700 w-full text-center"
+                                    >
+                                        {monthName}
+                                    </button>
+                                    <div className="grid grid-cols-7 gap-1 text-xs">
+                                        {days.slice(0, 35).map((dayInfo, idx) => {
+    const hasEvents = getEventsForDate(dayInfo.date).length > 0;
+    const hasTodos = getTodosForDate(dayInfo.date).length > 0;
+    const isToday = isSameDay(dayInfo.date, new Date());
+    
+    return (
+        <div
+                                                    key={idx}
+                                                    className={`
+                                                        text-center p-1 rounded text-xs
+                                                       ${isToday ? 'text-indigo-600 font-bold ring-2 ring-indigo-400' : dayInfo.isCurrentMonth ? 'text-slate-700' : 'text-slate-300'}
+                                                        ${(() => {
+                                                            if (!dayInfo.isCurrentMonth) return '';
+                                                            const dateStr = formatDate(dayInfo.date);
+                                                            const cycleDay = window.cycleData?.find(d => d.date === dateStr);
+                                                            const isFullMoonDay = window.moonHelper?.isFull?.(dayInfo.date);
+                                                            const isNewMoonDay = window.moonHelper?.isNew?.(dayInfo.date);
+                                                            if (cycleDay) return cycleDay.cramps ? 'bg-red-200 font-bold' : 'bg-red-100 font-bold';
+                                                            if (isFullMoonDay) return 'bg-yellow-100';
+                                                            if (isNewMoonDay) return 'bg-slate-200 ';
+                                                            const isFertile = window.cycleHelper?.isFertile?.(dayInfo.date);
+                                                            if (isFertile) return 'bg-pink-50';
+                                                            return (hasEvents || hasTodos) ? 'bg-purple-100 font-bold' : '';
+                                                        })()}
+                                                    `}
+                                                >
+                                                    {(() => {
+                                                        if (!dayInfo.isCurrentMonth) return dayInfo.day;
+                                                        const dateStr = formatDate(dayInfo.date);
+                                                        const ovulation = window.cycleHelper?.getOvulation?.();
+                                                        const isOvulation = ovulation && dateStr === formatDate(ovulation);
+                                                        if (isOvulation) return '🥚';
+                                                        return dayInfo.day;
+                                                    })()}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+
+            // ===== RENDU PRINCIPAL DU COMPOSANT =====
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4 md:p-8">
+                    <div className="max-w-7xl mx-auto">
+                        {showEventModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                                    <h3 className="text-xl font-bold text-purple-700 mb-4">Nouvel événement</h3>
+                                    <input
+                                        type="text"
+                                        value={newEventText}
+                                        onChange={(e) => setNewEventText(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                addEvent(formatDate(selectedDateForEvent), newEventText);
+                                            }
+                                        }}
+                                        placeholder="Concert, rendez-vous..."
+                                        className="w-full px-4 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
+                                        autoFocus
+                                    />
+                                    <p className="text-xs text-slate-500 mb-4 italic">
+                                        💡 Astuce : Ajoutez AN à la fin pour un événement annuel (ex: "Anniversaire Maman AN")
+                                    </p>
+                                    <div className="flex gap-2 justify-end">
+                                        <button
+                                            onClick={() => {
+                                                setShowEventModal(false);
+                                                setNewEventText('');
+                                            }}
+                                            className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
+                                        >
+                                            Annuler
+                                        </button>
+                                        <button
+                                            onClick={() => addEvent(formatDate(selectedDateForEvent), newEventText)}
+                                            className="px-4 py-2 bg-purple-500 text-slate-800 rounded-lg hover:bg-purple-600"
+                                        >
+                                            Ajouter
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+
+                        {/* Modal de configuration */}
+                        {showConfigModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                                <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold text-indigo-600">⚙️ Configurer mon planning</h2>
+                                        <button
+                                            onClick={() => setShowConfigModal(false)}
+                                            className="text-slate-500 hover:text-slate-700 text-2xl"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+
+                                    {/* Sélection semaine et jour */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Type de semaine</label>
+                                            <select
+                                                value={configWeekType}
+                                                onChange={(e) => setConfigWeekType(Number(e.target.value))}
+                                                className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {WEEK_TYPES.map((type, idx) => (
+                                                    <option key={idx} value={idx}>{type}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Jour</label>
+                                            <select
+                                                value={configDay}
+                                                onChange={(e) => setConfigDay(Number(e.target.value))}
+                                                className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {DAYS.map((day, idx) => (
+                                                    <option key={idx} value={idx}>{day}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Liste des tâches existantes */}
+                                    <div className="mb-6">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-3">Tâches actuelles</h3>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {getTasksForConfig(configWeekType, configDay).map((task, idx) => (
+                                                <div key={idx} className={`${COLORS[task.category]} rounded-lg p-3 border-l-4`}>
+                                                    {editingTask === idx ? (
+                                                        <div className="space-y-2">
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <input
+                                                                    type="time"
+                                                                    value={task.start}
+                                                                    onChange={(e) => updateCustomTask(idx, { ...task, start: e.target.value })}
+                                                                    className="px-2 py-1 border border-slate-300 rounded text-sm"
+                                                                />
+                                                                <input
+                                                                    type="time"
+                                                                    value={task.end}
+                                                                    onChange={(e) => updateCustomTask(idx, { ...task, end: e.target.value })}
+                                                                    className="px-2 py-1 border border-slate-300 rounded text-sm"
+                                                                />
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={task.task}
+                                                                onChange={(e) => updateCustomTask(idx, { ...task, task: e.target.value })}
+                                                                className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
+                                                            />
+                                                            <select
+                                                                value={task.category}
+                                                                onChange={(e) => updateCustomTask(idx, { ...task, category: e.target.value })}
+                                                                className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
+                                                            >
+                                                                <option value="menage">Ménage</option>
+                                                                <option value="repas">Repas</option>
+                                                                <option value="travail">Travail</option>
+                                                                <option value="sport">Sport/Soin</option>
+                                                                <option value="sortie">Sortie/Pages</option>
+                                                                <option value="emails">Emails</option>
+                                                            </select>
+                                                            <button
+                                                                onClick={() => setEditingTask(null)}
+                                                                className="px-3 py-1 bg-green-500 text-slate-800 rounded text-sm hover:bg-green-600"
+                                                            >
+                                                                Terminer
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex-1">
+                                                                <div className="font-bold text-sm opacity-70">
+                                                                    {task.start} - {task.end}
+                                                                </div>
+                                                                <div className="font-semibold text-sm">{task.task}</div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => setEditingTask(idx)}
+                                                                    className="px-3 py-1 bg-blue-500 text-slate-800 rounded text-sm hover:bg-blue-600"
+                                                                >
+                                                                    Modifier
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => deleteCustomTask(idx)}
+                                                                    className="px-3 py-1 bg-red-500 text-slate-800 rounded text-sm hover:bg-red-600"
+                                                                >
+                                                                    Supprimer
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {getTasksForConfig(configWeekType, configDay).length === 0 && (
+                                                <p className="text-slate-400 italic text-center py-4">Aucune tâche pour ce jour</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Ajouter une nouvelle tâche */}
+                                    <div className="bg-slate-50 rounded-lg p-4 mb-6">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-3">➕ Ajouter une tâche</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-600 mb-1">Heure de début</label>
+                                                <input
+                                                    type="time"
+                                                    value={newTask.start}
+                                                    onChange={(e) => setNewTask({ ...newTask, start: e.target.value })}
+                                                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-600 mb-1">Heure de fin</label>
+                                                <input
+                                                    type="time"
+                                                    value={newTask.end}
+                                                    onChange={(e) => setNewTask({ ...newTask, end: e.target.value })}
+                                                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-600 mb-1">Description de la tâche</label>
+                                                <input
+                                                    type="text"
+                                                    value={newTask.task}
+                                                    onChange={(e) => setNewTask({ ...newTask, task: e.target.value })}
+                                                    placeholder="Ex: YOGA, emails, cuisine..."
+                                                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-600 mb-1">Catégorie</label>
+                                                <select
+                                                    value={newTask.category}
+                                                    onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                                                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg"
+                                                >
+                                                    <option value="menage">🧹 Ménage</option>
+                                                    <option value="repas">🍳 Repas</option>
+                                                    <option value="travail">💼 Travail</option>
+                                                    <option value="sport">💪 Sport/Soin</option>
+                                                    <option value="sortie">🚶 Sortie</option>
+                                                    <option value="emails">📧 Emails</option>
+<option value="ecriture">📝Écriture</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={addCustomTask}
+                                            className="w-full mt-3 px-4 py-2 bg-green-500 text-slate-800 rounded-lg hover:bg-green-600 font-bold"
+                                        >
+                                            ✓ Ajouter cette tâche
+                                        </button>
+                                    </div>
+
+                                    {/* Boutons d'action */}
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={resetToDefault}
+                                            className="flex-1 px-4 py-2 bg-orange-500 text-slate-800 rounded-lg hover:bg-orange-600 font-bold"
+                                        >
+                                            🔄 Réinitialiser tout
+                                        </button>
+                                        <button
+                                            onClick={() => setShowConfigModal(false)}
+                                            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold"
+                                        >
+                                            ✓ Terminer
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+
+                        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <CalendarIcon />
+                                    <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                        Mon Planificateur
+                                    </h1>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowConfigModal(true)}
+                                        className="px-4 py-2 bg-purple-500 text-slate-800 rounded-lg hover:bg-purple-600 transition-colors font-medium flex items-center gap-2"
+                                    >
+                                        <SettingsIcon />
+                                        <span className="hidden md:inline">Configurer</span>
+                                    </button>
+                                    <button
+                                        onClick={goToToday}
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                                    >
+                                        Aujourd'hui
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                   <button
+    onClick={() => {
+        if (viewMode === 'day') goToPreviousDay();
+        else if (viewMode === 'week') {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 7);
+            setCurrentDate(newDate);
+        }
+        else if (viewMode === 'month') goToPreviousMonth();
+        else if (viewMode === 'year') goToPreviousYear();
+    }}
+                                        className="p-2 rounded-lg bg-slate-200 hover:bg-slate-200 transition-colors"
+                                    >
+                                        <ChevronLeft />
+                                    </button>
+                                    
+                                    <h2 className="text-2xl md:text-3xl font-bold text-indigo-600 min-w-[250px] text-center">
+                                        {viewMode === 'day' && (
+                                            <>
+                                                {DAYS[currentDay]} {currentDate.getDate()} {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+                                            </>
+                                        )}
+                                        {viewMode === 'week' && `Semaine ${getWeekOfMonth(currentDate)} - ${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+                                        {viewMode === 'month' && `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+                                        {viewMode === 'year' && currentDate.getFullYear()}
+                                    </h2>
+                                    
+                                    <button
+    onClick={() => {
+        if (viewMode === 'day') goToNextDay();
+        else if (viewMode === 'week') {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 7);
+            setCurrentDate(newDate);
+        }
+        else if (viewMode === 'month') goToNextMonth();
+        else if (viewMode === 'year') goToNextYear();
+    }}
+                                        className="p-2 rounded-lg bg-slate-200 hover:bg-slate-200 transition-colors"
+                                    >
+                                        <ChevronRight />
+                                    </button>
+                                </div>
+
+                                <div className="flex gap-2 flex-wrap justify-center">
+                                    <button
+                                        onClick={() => setViewMode('day')}
+                                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                                            viewMode === 'day'
+                                                ? 'bg-indigo-600 text-white shadow-md'
+                                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                        }`}
+                                    >
+                                        Jour
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('week')}
+                                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                                            viewMode === 'week'
+                                                ? 'bg-indigo-600 text-white shadow-md'
+                                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                        }`}
+                                    >
+                                        Semaine
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('month')}
+                                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                                            viewMode === 'month'
+                                                ? 'bg-indigo-600 text-white shadow-md'
+                                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                        }`}
+                                    >
+                                        Mois
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('year')}
+                                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                                            viewMode === 'year'
+                                                ? 'bg-indigo-600 text-white shadow-md'
+                                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                        }`}
+                                    >
+                                        Année
+                                    </button>
+                                </div>
+                            </div>
+
+                            {viewMode === 'day' && (
+                                <div className="flex flex-wrap gap-3 text-xs">
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-amber-100 border-2 border-amber-300 rounded"></div>
+                                        <span className="text-slate-600">Ménage</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-pink-100 border-2 border-pink-300 rounded"></div>
+                                        <span className="text-slate-600">Repas</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-yellow-100 border-2 border-yellow-300 rounded"></div>
+                                        <span className="text-slate-600">Travail</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-blue-100 border-2 border-blue-300 rounded"></div>
+                                        <span className="text-slate-600">Sport/Soin</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded"></div>
+                                        <span className="text-slate-600">Sortie/Pages</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-4 h-4 bg-gray-100 border-2 border-gray-300 rounded"></div>
+                                        <span className="text-slate-600">Emails</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-lg p-6">
+                            {viewMode === 'day' && renderDaySchedule()}
+                            {viewMode === 'week' && renderWeekView()}
+                            {viewMode === 'month' && renderMonthView()}
+                            {viewMode === 'year' && renderYearView()}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<WeeklyPlanner />);
+    </script>
+
+    
+    <!-- Script Post-its (JavaScript vanilla) -->
+    <script>
+        // Données post-its
+        let postits = JSON.parse(localStorage.getItem('postits') || '[]');
+        const colors = [
+            { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E' },
+            { bg: '#DBEAFE', border: '#93C5FD', text: '#1E3A8A' },
+            { bg: '#FCE7F3', border: '#F9A8D4', text: '#831843' },
+            { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46' }
+        ];
+
+        function savePostits() {
+            localStorage.setItem('postits', JSON.stringify(postits));
+        }
+
+        function addPostit() {
+            if (postits.length >= 4) return alert('Maximum 4 post-its !');
+            const color = colors[postits.length];
+            postits.push({ id: Date.now(), title: '', content: '', color });
+            savePostits();
+            renderPostits();
+        }
+
+        function updatePostit(id, field, value) {
+            const postit = postits.find(p => p.id === id);
+            if (postit) {
+                postit[field] = value;
+                savePostits();
+            }
+        }
+
+        function deletePostit(id) {
+            if (confirm('Supprimer ce post-it ?')) {
+                postits = postits.filter(p => p.id !== id);
+                savePostits();
+                renderPostits();
+            }
+        }
+
+        function renderPostits() {
+            const container = document.getElementById('postit-container');
+            if (postits.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #94A3B8; font-size: 12px; font-style: italic; padding: 20px;">Clique sur + pour créer un post-it !</p>';
+                return;
+            }
+            
+            container.innerHTML = postits.map(p => `
+                <div class="postit-item" style="background: ${p.color.bg}; border-color: ${p.color.border}; color: ${p.color.text};">
+                    <input 
+                        type="text" 
+                        placeholder="Titre..." 
+                        value="${p.title}"
+                        onchange="updatePostit(${p.id}, 'title', this.value)"
+                    />
+                    <textarea 
+                        placeholder="Contenu..."
+                        onchange="updatePostit(${p.id}, 'content', this.value)"
+                    >${p.content}</textarea>
+                    <button 
+                        onclick="deletePostit(${p.id})"
+                        style="background: none; border: none; color: #DC2626; cursor: pointer; font-size: 11px; margin-top: 4px;"
+                    >🗑️ Supprimer</button>
+                </div>
+            `).join('');
+        }
+
+        // Charger au démarrage
+        renderPostits();
+// Toggle post-its
+function togglePostits() {
+    const widget = document.getElementById('postit-widget');
+    widget.classList.toggle('hidden');
+}
+    </script>
+
+
+
+
+    <!-- Script Courses -->
+    <script>
+        let coursesData = JSON.parse(localStorage.getItem('coursesData') || '[]');
+        // Structure: [{ id, name, items: [{ id, text, checked }] }]
+
+        function saveCoursesData() {
+            localStorage.setItem('coursesData', JSON.stringify(coursesData));
+        }
+
+        function toggleCoursesPanel() {
+            const panel = document.getElementById('courses-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addCoursesStore() {
+            coursesData.push({ id: Date.now(), name: 'Nouveau magasin', items: [] });
+            saveCoursesData();
+            renderCourses();
+        }
+
+        function deleteCoursesStore(storeId) {
+            if (confirm('Supprimer ce magasin ?')) {
+                coursesData = coursesData.filter(s => s.id !== storeId);
+                saveCoursesData();
+                renderCourses();
+            }
+        }
+
+        function updateStoreName(storeId, name) {
+            const store = coursesData.find(s => s.id === storeId);
+            if (store) { store.name = name; saveCoursesData(); }
+        }
+
+        function addItem(storeId) {
+            const store = coursesData.find(s => s.id === storeId);
+            if (!store) return;
+            const input = document.getElementById('new-item-' + storeId);
+            const text = input ? input.value.trim() : '';
+            if (!text) return;
+            store.items.push({ id: Date.now(), text, checked: false });
+            saveCoursesData();
+            renderCourses();
+        }
+
+        function toggleItem(storeId, itemId) {
+            const store = coursesData.find(s => s.id === storeId);
+            if (!store) return;
+            const item = store.items.find(i => i.id === itemId);
+            if (item) { item.checked = !item.checked; saveCoursesData(); renderCourses(); }
+        }
+
+        function deleteItem(storeId, itemId) {
+            const store = coursesData.find(s => s.id === storeId);
+            if (!store) return;
+            store.items = store.items.filter(i => i.id !== itemId);
+            saveCoursesData();
+            renderCourses();
+        }
+
+        function uncheckAll(storeId) {
+            const store = coursesData.find(s => s.id === storeId);
+            if (!store) return;
+            store.items.forEach(i => i.checked = false);
+            saveCoursesData();
+            renderCourses();
+        }
+
+        function renderCourses() {
+            const container = document.getElementById('courses-container');
+            if (!container) return;
+
+            if (coursesData.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;font-style:italic;padding:20px;">Clique sur + Magasin pour commencer !</p>';
+                return;
+            }
+
+            const storeColors = ['#f0fdf4','#eff6ff','#fef9ec','#fdf4ff'];
+            const borderColors = ['#86efac','#93c5fd','#fcd34d','#d8b4fe'];
+
+            container.innerHTML = coursesData.map((store, si) => {
+                const bg = storeColors[si % storeColors.length];
+                const border = borderColors[si % borderColors.length];
+                const checked = store.items.filter(i => i.checked).length;
+                const total = store.items.length;
+
+                const itemsHtml = store.items.map(item => `
+                    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                        <input type="checkbox" ${item.checked ? 'checked' : ''} 
+                            onchange="toggleItem(${store.id}, ${item.id})"
+                            style="width:16px;height:16px;cursor:pointer;accent-color:#47ed79;flex-shrink:0;" />
+                        <span style="flex:1;font-size:13px;${item.checked ? 'text-decoration:line-through;color:#94a3b8;' : 'color:#1e293b;'}">${item.text}</span>
+                        <button onclick="deleteItem(${store.id}, ${item.id})" 
+                            style="background:none;border:none;cursor:pointer;font-size:14px;color:#dc2626;opacity:0.6;padding:0 2px;" title="Supprimer">×</button>
+                    </div>
+                `).join('');
+
+                return `
+                <div style="background:${bg};border:2px solid ${border};border-radius:12px;padding:12px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <input type="text" value="${store.name.replace(/"/g,'&quot;')}"
+                            onchange="updateStoreName(${store.id}, this.value)"
+                            style="flex:1;font-weight:bold;font-size:14px;border:none;background:transparent;outline:none;color:#166534;border-bottom:2px dashed ${border};" />
+                        <span style="font-size:11px;color:#64748b;white-space:nowrap;">${checked}/${total}</span>
+                        ${checked > 0 ? `<button onclick="uncheckAll(${store.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:#6366f1;text-decoration:underline;" title="Tout décocher">↺</button>` : ''}
+                        <button onclick="deleteCoursesStore(${store.id})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;opacity:0.7;" title="Supprimer ce magasin">🗑️</button>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        ${itemsHtml}
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:6px;">
+                        <input type="text" id="new-item-${store.id}" placeholder="Ajouter un ingrédient..."
+                            onkeypress="if(event.key==='Enter') addItem(${store.id})"
+                            style="flex:1;padding:5px 8px;border:1px solid ${border};border-radius:6px;font-size:12px;outline:none;" />
+                        <button onclick="addItem(${store.id})" 
+                            style="background:#47ed79;color:white;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;">+</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        renderCourses();
+    </script>
+
+    <!-- Script Cycle & Lunes -->
+    <script>
+        // Données cycle
+        let cycleData = JSON.parse(localStorage.getItem('cycleData') || '[]');
+        window.cycleData = cycleData;
+        
+        // Calculs lunaires
+        function getMoonPhase(date) {
+    const knownNewMoon = new Date('2025-01-29T12:36:00Z');
+    const lunarCycle = 29.53059;
+    const diff = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
+    const phase = ((diff % lunarCycle) + lunarCycle) % lunarCycle;
+    // Plus précis : ±0.5 jour au lieu de ±1.5
+    if (phase < 0.5 || phase > 29) return 'new';
+    if (phase > 14 && phase < 15) return 'full';
+    return null;
+}
+        
+        function isNewMoon(date) { return getMoonPhase(date) === 'new'; }
+        function isFullMoon(date) { return getMoonPhase(date) === 'full'; }
+        
+        // Calculs cycle
+        function getCycles() {
+            if (cycleData.length === 0) return [];
+            const periods = [];
+            let current = [];
+            cycleData.forEach((day) => {
+                if (current.length === 0) {
+                    current.push(day);
+                } else {
+                    const lastDate = new Date(current[current.length - 1].date);
+                    const thisDate = new Date(day.date);
+                    const diff = (thisDate - lastDate) / (1000 * 60 * 60 * 24);
+                    if (diff <= 1) current.push(day);
+                    else { periods.push([...current]); current = [day]; }
+                }
+            });
+            if (current.length > 0) periods.push(current);
+            return periods;
+        }
+        
+        function getLastPeriod() { const periods = getCycles(); return periods.length > 0 ? periods[periods.length - 1] : null; }
+        
+        function getCycleLength() {
+            const periods = getCycles();
+            if (periods.length < 2) return 29;
+            let total = 0;
+            for (let i = 1; i < periods.length; i++) {
+                const d1 = new Date(periods[i-1][0].date);
+                const d2 = new Date(periods[i][0].date);
+                total += (d2 - d1) / (1000 * 60 * 60 * 24);
+            }
+            return Math.round(total / (periods.length - 1));
+        }
+        
+        function getPredictedOvulation() { const last = getLastPeriod(); if (!last) return null; const d = new Date(last[0].date); d.setDate(d.getDate() + 13); return d; }
+        function getPredictedNextPeriod() { const last = getLastPeriod(); if (!last) return null; const d = new Date(last[0].date); d.setDate(d.getDate() + getCycleLength()); return d; }
+        function isFertileWindow(date) { const last = getLastPeriod(); if (!last) return false; const start = new Date(last[0].date); start.setDate(start.getDate() + 8); const end = new Date(last[0].date); end.setDate(end.getDate() + 14); return date >= start && date <= end; }
+        
+        // Gestion données
+        function addCycleDay(dateStr, flow, cramps) {
+            const existing = cycleData.findIndex(d => d.date === dateStr);
+            if (existing >= 0) {
+                cycleData[existing].flow = flow;
+                cycleData[existing].cramps = cramps || false;
+            } else { 
+                cycleData.push({ date: dateStr, flow: flow, cramps: cramps || false }); 
+                cycleData.sort((a, b) => new Date(a.date) - new Date(b.date)); 
+            }
+            localStorage.setItem('cycleData', JSON.stringify(cycleData));
+            window.cycleData = cycleData;
+            updateCycleStats();
+        }
+        
+        function removeCycleDay(dateStr) {
+            cycleData = cycleData.filter(d => d.date !== dateStr);
+            localStorage.setItem('cycleData', JSON.stringify(cycleData));
+            window.cycleData = cycleData;
+            updateCycleStats();
+        }
+        
+        function getCycleDay(dateStr) { return cycleData.find(d => d.date === dateStr); }
+        
+        // Panneau de stats
+        function toggleCyclePanel() {
+            const panel = document.getElementById('cycle-panel');
+            if (panel.style.display === 'none') { panel.style.display = 'block'; updateCycleStats(); }
+            else panel.style.display = 'none';
+        }
+        
+        function updateCycleStats() {
+            const stats = document.getElementById('cycle-stats');
+            const lastPeriod = getLastPeriod();
+            if (!lastPeriod) { stats.innerHTML = '<p>Aucune donnée.</p><p style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 12px; font-style: italic;">💡 Clic droit en vue Mois</p>'; return; }
+            const cycleLength = getCycleLength();
+            const lastDate = new Date(lastPeriod[0].date).toLocaleDateString('fr-FR');
+            const nextPeriod = getPredictedNextPeriod();
+            const ovulation = getPredictedOvulation();
+            let html = '<div style="line-height: 1.8;">';
+            html += `<div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Cycle moyen :</span><strong>${cycleLength} jours</strong></div>`;
+            html += `<div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Dernières règles :</span><strong>${lastDate}</strong></div>`;
+            if (nextPeriod) html += `<div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Prochaines prévues :</span><strong style="color: #EC4899;">${nextPeriod.toLocaleDateString('fr-FR')}</strong></div>`;
+            if (ovulation) html += `<div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Ovulation prévue :</span><strong>🥚 ${ovulation.toLocaleDateString('fr-FR')}</strong></div>`;
+            html += '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 12px; color: #666; font-style: italic;">💡 Clic droit en vue Mois</div></div>';
+            stats.innerHTML = html;
+        }
+        
+        // Exposer à React
+        window.cycleHelper = { add: addCycleDay, remove: removeCycleDay, get: getCycleDay, getOvulation: getPredictedOvulation, getNextPeriod: getPredictedNextPeriod, isFertile: isFertileWindow };
+        window.moonHelper = { isNew: isNewMoon, isFull: isFullMoon };
+    </script>
+
+
+    <!-- Script Intermittence -->
+    <script>
+        let interData = JSON.parse(localStorage.getItem('interData') || '{"birthdate":"12-13","events":{}}');
+        window.interData = interData;
+        
+        function toggleIntermittencePanel() {
+            const panel = document.getElementById('intermittence-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (panel.style.display === 'block') updateInterStats();
+        }
+        
+        function saveInter() {
+            localStorage.setItem('interData', JSON.stringify(interData));
+            window.interData = interData;
+        }
+        
+        function getPeriod() {
+            const [m, d] = interData.birthdate.split('-').map(Number);
+            const today = new Date();
+            let y = today.getFullYear();
+            let start = new Date(y, m-1, d);
+            if (today < start) { y--; start = new Date(y, m-1, d); }
+            return { start, end: new Date(y+1, m-1, d) };
+        }
+        
+        function countCachets() {
+            const p = getPeriod();
+            let c = 0, o = 0;
+            Object.entries(interData.events).forEach(([eventId, data]) => {
+                const d = new Date(data.date);
+                if (d >= p.start && d < p.end && data.counted) {
+                    if (data.type === 'cachet') c++;
+                    if (data.type === 'option') o++;
+                }
+            });
+            return { cachets: c, options: o, total: c + o };
+        }
+        
+       function updateInterStats() {
+    const el = document.getElementById('intermittence-stats');
+    const p = getPeriod();
+    const cnt = countCachets();
+    const days = Math.ceil((p.end - new Date()) / 86400000);
+    
+    // Calcul des deux restes
+    const resteSur = Math.max(0, 43 - cnt.cachets);
+    const resteOptimiste = Math.max(0, 43 - (cnt.cachets + cnt.options));
+    
+    el.innerHTML = `
+        <div style="line-height:2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <span style="font-size:12px;color:#666">Période: ${p.start.toLocaleDateString('fr')} → ${p.end.toLocaleDateString('fr')}</span>
+                <button onclick="editBD()" style="background:none;border:none;cursor:pointer;font-size:16px">✏️</button>
+            </div>
+            <div style="border-top:1px solid #ddd;padding-top:10px;margin-bottom:10px"></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>💊 Cachets effectués:</span><strong>${cnt.cachets} / 43</strong></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>🤞🏼 Options prévues:</span><strong>${cnt.options}</strong></div>
+            
+            <div style="border-top:2px solid #8B5CF6;padding-top:8px;margin:8px 0"></div>
+            
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#666;font-size:14px;font-weight:bold;">
+                <span>Reste SÛR:</span><span>${resteSur} cachets</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;color:#666;font-size:14px;font-weight:bold;">
+                <span>Reste OPTIMISTE:</span><span>${resteOptimiste} cachets</span>
+            </div>
+
+            <div style="border-top:1px solid #ddd;padding-top:10px"></div>
+            <div style="display:flex;justify-content:space-between;color:#666;font-size:13px"><span>Jours restants:</span><span>${days} jours</span></div>
+        </div>
+    `;
+}
+        
+        function editBD() {
+            const n = prompt('Date anniversaire (MM-JJ, ex: 12-13):', interData.birthdate);
+            if (n && /^\d{1,2}-\d{1,2}$/.test(n)) {
+                interData.birthdate = n;
+                saveInter();
+                updateInterStats();
+            }
+        }
+        
+        window.interHelper = {
+            add: (eventId, dateStr, type) => { 
+                interData.events[eventId] = { type, counted: true, date: dateStr }; 
+                saveInter(); 
+            },
+            remove: (eventId) => { 
+                delete interData.events[eventId]; 
+                saveInter(); 
+            },
+            toggle: (eventId) => { 
+                if (interData.events[eventId]) {
+                    interData.events[eventId].counted = !interData.events[eventId].counted;
+                    saveInter();
+                    return interData.events[eventId].counted;
+                }
+                return false;
+            },
+            get: (eventId) => interData.events[eventId] || null
+        };
+
+    // ── Export all data as JSON file ─────────────────────────────────────────
+    window._exportData = () => {
+        const data = {};
+        ['plannerEvents','plannerTodos','customWeekData','cycleData','interData','postits','coursesData']
+            .forEach(k => { const v = localStorage.getItem(k); if (v) data[k] = JSON.parse(v); });
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'planificateur-backup-' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // ── Import data from JSON file ────────────────────────────────────────────
+    window._importData = () => {
+        const input = document.createElement('input');
+        input.type  = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v)));
+                    window._reloadAllUI && window._reloadAllUI();
+                    alert('✅ Données importées avec succès !');
+                } catch(e) { alert('❌ Fichier invalide : ' + e.message); }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    };
+
+    </script>
+
+
+    <!-- ═══════ Script Membres ═══════ -->
+    <script>
+    // Couleur sélectionnée par défaut
+    let selectedMembreColor = '#22c55e';
+
+    // Charger depuis localStorage
+    let membresData = JSON.parse(localStorage.getItem('membresData') || '[]');
+    // Format : [{ nom: "Kim", color: "#22c55e" }, ...]
+
+    function toggleMembresPanel() {
+        const panel = document.getElementById('membres-panel');
+        if (panel.style.display === 'none') {
+            renderMembresList();
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function selectMembreColor(color) {
+        selectedMembreColor = color;
+        // Highlight selected
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.style.border = btn.dataset.color === color
+                ? '3px solid #1e293b'
+                : '3px solid transparent';
+        });
+    }
+
+    function addMembre() {
+        const input = document.getElementById('membre-nom-input');
+        const nom = input.value.trim();
+        if (!nom) return;
+        // Check duplicate
+        if (membresData.some(m => m.nom.toLowerCase() === nom.toLowerCase())) {
+            input.style.borderColor = '#ef4444';
+            setTimeout(() => input.style.borderColor = '#e2e8f0', 1500);
+            return;
+        }
+        membresData.push({ nom: nom, color: selectedMembreColor });
+        localStorage.setItem('membresData', JSON.stringify(membresData));
+        window.membresData = membresData;
+        input.value = '';
+        renderMembresList();
+    }
+
+    function deleteMembre(nom) {
+        membresData = membresData.filter(m => m.nom !== nom);
+        localStorage.setItem('membresData', JSON.stringify(membresData));
+        window.membresData = membresData;
+        renderMembresList();
+    }
+
+    function renderMembresList() {
+        const list = document.getElementById('membres-list');
+        if (!list) return;
+        if (membresData.length === 0) {
+            list.innerHTML = '<p style="color:#94a3b8; font-size:13px; font-style:italic;">Aucun membre. Ajoute un prénom ci-dessous.</p>';
+            return;
+        }
+        list.innerHTML = membresData.map(m => `
+            <div style="display:flex; align-items:center; gap:8px; padding:7px 10px;
+                background:#f8fafc; border-radius:8px; margin-bottom:6px;">
+                <div style="width:18px; height:18px; border-radius:50%; background:${m.color}; flex-shrink:0;"></div>
+                <span style="flex:1; font-size:14px; font-weight:600; color:#334155;">${m.nom}</span>
+                <button onclick="deleteMembre('${m.nom}')"
+                    style="background:none; border:none; color:#cbd5e1; font-size:18px; cursor:pointer;
+                           line-height:1; padding:0 2px;"
+                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'">×</button>
+            </div>
+        `).join('');
+    }
+
+    // Expose globally for React
+    window.membresData = membresData;
+
+    // Function used by React to get member color for an event text
+    window.getMemberColor = function(text) {
+        if (!window.membresData || window.membresData.length === 0) return null;
+        const lower = text.toLowerCase();
+        for (const m of window.membresData) {
+            if (lower.includes(m.nom.toLowerCase())) {
+                return m.color;
+            }
+        }
+        return null;
+    };
+
+    // Init on load
+    window.addEventListener('load', () => {
+        membresData = JSON.parse(localStorage.getItem('membresData') || '[]');
+        window.membresData = membresData;
+        // Select first color by default
+        selectMembreColor('#22c55e');
+    });
+    </script>
+
+    <!-- ═══════ Script Modules ═══════ -->
+    <script>
+    // Modules par défaut : tous activés
+    const DEFAULT_MODULES = { cycle: true, inter: true, courses: true, postits: true, membres: true };
+    let modulesConfig = JSON.parse(localStorage.getItem('modulesConfig') || JSON.stringify(DEFAULT_MODULES));
+
+    function toggleModulesPanel() {
+        const panel = document.getElementById('modules-panel');
+        if (panel.style.display === 'none') {
+            // Sync checkboxes with current config before showing
+            document.getElementById('mod-cycle').checked   = modulesConfig.cycle;
+            document.getElementById('mod-inter').checked   = modulesConfig.inter;
+            document.getElementById('mod-courses').checked = modulesConfig.courses;
+            document.getElementById('mod-postits').checked = modulesConfig.postits;
+            document.getElementById('mod-membres').checked = modulesConfig.membres !== false;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    // Montre/cache uniquement les boutons toggle (pas les panneaux)
+    function setModuleVisible(module, visible) {
+        const toggleIds = {
+            cycle:   'cycle-toggle',
+            inter:   'intermittence-toggle',
+            courses: 'courses-toggle',
+            postits: 'postit-toggle',
+            membres: 'membres-toggle',
+        };
+        // Panneaux à FERMER si on désactive le module
+        const panelIds = {
+            cycle:   'cycle-panel',
+            inter:   'intermittence-panel',
+            courses: 'courses-panel',
+            postits: 'postit-widget',
+            membres: 'membres-panel',
+        };
+        const toggleEl = document.getElementById(toggleIds[module]);
+        const panelEl  = document.getElementById(panelIds[module]);
+        if (toggleEl) toggleEl.style.display = visible ? '' : 'none';
+        // Si on désactive, on ferme aussi le panneau
+        if (!visible && panelEl) panelEl.style.display = 'none';
+        // Si on active, on laisse le panneau fermé (display:none) — l'utilisateur l'ouvre elle-même
+    }
+
+    function applyModules() {
+        modulesConfig = {
+            cycle:   document.getElementById('mod-cycle').checked,
+            inter:   document.getElementById('mod-inter').checked,
+            courses: document.getElementById('mod-courses').checked,
+            postits: document.getElementById('mod-postits').checked,
+            membres: document.getElementById('mod-membres').checked,
+        };
+        localStorage.setItem('modulesConfig', JSON.stringify(modulesConfig));
+        Object.keys(modulesConfig).forEach(k => setModuleVisible(k, modulesConfig[k]));
+    }
+
+    // Appliquer au chargement
+    function initModules() {
+        modulesConfig = JSON.parse(localStorage.getItem('modulesConfig') || JSON.stringify(DEFAULT_MODULES));
+        Object.keys(modulesConfig).forEach(k => {
+            if (!modulesConfig[k]) setModuleVisible(k, false);
+        });
+    }
+
+    // Lancer après le chargement complet
+    window.addEventListener('load', () => setTimeout(initModules, 300));
+    </script>
+
+    <!-- Service Worker pour PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/monplanificateur/service-worker.js')
+                    .then((registration) => {
+                        console.log('✅ Service Worker enregistré:', registration);
+                    })
+                    .catch((error) => {
+                        console.log('❌ Service Worker échoué:', error);
+                    });
+            });
+        }
+    </script>
+    <!-- Bouton Courses -->
+    <button id="courses-toggle" onclick="toggleCoursesPanel()" style="position: fixed; top: 20px; left: 110px; background: #47ed79; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10001;">
+        🛒
+    </button>
+
+    <!-- Panneau Courses -->
+    <div id="courses-panel" style="display: none; position: fixed; top: 60px; left: 110px; width: 340px; max-height: 80vh; overflow-y: auto; background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); padding: 16px; z-index: 10000; border: 3px solid #47ed79;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="margin: 0; color: #22c55e; font-weight: bold; font-size: 18px;">🛒 Liste de courses</h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button onclick="addCoursesStore()" style="background: #47ed79; color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">+ Magasin</button>
+                <button onclick="toggleCoursesPanel()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999; line-height: 1;">×</button>
+            </div>
+        </div>
+        <div id="courses-container"></div>
+    </div>
+
+</div><!-- /app-container -->
+
+
+    <!-- PANNEAU DEBUG TEMPORAIRE -->
+    <div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;background:#1e1e1e;color:#00ff00;font-family:monospace;font-size:11px;padding:8px;z-index:99999;max-height:180px;overflow-y:auto;">
+        <strong style="color:yellow">🔍 DEBUG</strong> <button onclick="document.getElementById('debug-panel').style.display='none'" style="float:right;background:red;color:white;border:none;padding:2px 6px;cursor:pointer">X</button>
+        <div id="debug-log"></div>
+    </div>
+    <script>
+    function dbg(msg, color) {
+        const el = document.getElementById('debug-log');
+        if (!el) return;
+        const line = document.createElement('div');
+        line.style.color = color || '#00ff00';
+        line.textContent = new Date().toLocaleTimeString() + ' → ' + msg;
+        el.appendChild(line);
+        el.scrollTop = el.scrollHeight;
+        console.log(msg);
+    }
+    window.dbg = dbg;
+    // Test du monkey-patch après chargement complet
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            window.dbg('🧪 Test monkey-patch...', 'white');
+            const before = localStorage.getItem('__test__');
+            localStorage.setItem('plannerEvents', localStorage.getItem('plannerEvents') || '{}');
+            window.dbg('🧪 Si tu vois 💾 au-dessus, le patch marche !', 'white');
+        }, 2000);
+    });
+    </script>
+</body>
+</html>
