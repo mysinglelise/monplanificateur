@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Récap mensuel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --ink: #1a1a2e;
+    --soft: #4a4a6a;
+    --muted: #8888aa;
+    --line: #e8e8f0;
+    --bg: #fafaf8;
+    --accent: #7c6fcd;
+    --warm: #e8845a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .recap-header {
+    padding: 48px 0 32px;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 48px;
+    position: relative;
+  }
+  .recap-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--warm), var(--accent));
+  }
+  .recap-mois {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .recap-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* SELECTEUR MOIS */
+  .mois-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 24px 0 0;
+  }
+  .mois-nav button {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--soft);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .mois-nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .mois-label { font-size: 14px; color: var(--soft); min-width: 140px; text-align: center; }
+
+  /* LAYOUT */
+  .recap-body {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* SECTIONS */
+  .section {
+    margin-bottom: 48px;
+    animation: fadeUp .4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .section:nth-child(1) { animation-delay: .05s; }
+  .section:nth-child(2) { animation-delay: .1s; }
+  .section:nth-child(3) { animation-delay: .15s; }
+  .section:nth-child(4) { animation-delay: .2s; }
+  .section:nth-child(5) { animation-delay: .25s; }
+  .section:nth-child(6) { animation-delay: .3s; }
+  .section:nth-child(7) { animation-delay: .35s; }
+  .section:nth-child(8) { animation-delay: .4s; }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .section-icon { font-size: 20px; }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 14px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-lbl {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* PROSE */
+  .prose {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--soft);
+  }
+  .prose strong { color: var(--ink); font-weight: 500; }
+
+  /* BAR */
+  .bar-wrap { margin-bottom: 10px; }
+  .bar-label { font-size: 12px; color: var(--soft); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .bar-track { background: var(--line); border-radius: 4px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--warm)); transition: width .6s ease; }
+
+  /* LISTE */
+  .item-list { list-style: none; }
+  .item-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--soft);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.5;
+  }
+  .item-list li:last-child { border-bottom: none; }
+  .item-list li .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0; margin-top: 6px;
+  }
+  .item-date { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; padding-left: 12px; }
+
+  /* PILLS */
+  .pills { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pill {
+    font-size: 12px; padding: 4px 12px;
+    border-radius: 16px; border: 1px solid var(--line);
+    color: var(--soft); background: white;
+  }
+  .pill.done { border-color: #a8d5b5; color: #2d7a4f; background: #f0faf4; }
+  .pill.en-cours { border-color: #b5c8f0; color: #2d4a8a; background: #f0f4ff; }
+
+  /* VELO */
+  .velo-equiv {
+    font-size: 13px; color: var(--soft);
+    background: white; border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; margin-top: 12px;
+    font-style: italic;
+  }
+
+  /* JOURS CALENDRIER */
+  .day-list { display: flex; flex-direction: column; gap: 0; }
+  .day-item {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+    display: flex; gap: 14px; align-items: baseline;
+  }
+  .day-item:last-child { border-bottom: none; }
+  .day-dt {
+    font-size: 11px; color: var(--muted);
+    min-width: 80px; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-evts { font-size: 13px; color: var(--soft); line-height: 1.5; }
+
+  /* UNIVERS */
+  .eclat-item {
+    padding: 10px 14px;
+    background: white;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--soft);
+    line-height: 1.55;
+  }
+  .eclat-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* VIDE */
+  .empty-note { font-size: 13px; color: var(--muted); font-style: italic; }
+
+  /* ACTIONS */
+  .actions-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(250,250,248,0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+    padding: 12px 24px;
+    display: flex; gap: 10px; justify-content: center;
+  }
+  .btn-print {
+    padding: 9px 22px;
+    background: var(--accent);
+    color: white; border: none;
+    border-radius: 8px; font-size: 13px;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+  }
+  .btn-copy {
+    padding: 9px 22px;
+    background: white;
+    color: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 8px; font-size: 13px;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .btn-close {
+    padding: 9px 22px;
+    background: white;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 8px; font-size: 13px;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+
+  /* PRINT */
+  @media print {
+    .actions-bar { display: none; }
+    .mois-nav { display: none; }
+    body { background: white; }
+    .section { animation: none; }
+    .recap-header::before { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+
+  .no-data { padding: 24px 0; text-align: center; color: var(--muted); font-size: 13px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="recap-header">
+  <div class="recap-mois" id="titre-mois">Janvier 2025</div>
+  <div class="recap-subtitle">Récapitulatif mensuel</div>
+  <div class="mois-nav">
+    <button onclick="changeMois(-1)">&#8592;</button>
+    <span class="mois-label" id="nav-label"></span>
+    <button onclick="changeMois(1)">&#8594;</button>
+  </div>
+</div>
+
+<div class="recap-body" id="recap-body">
+  <div class="no-data">Chargement...</div>
+</div>
+
+<div class="actions-bar">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
+  <button class="btn-copy" onclick="copyText()">📋 Copier le texte</button>
+  <button class="btn-close" onclick="window.parent && window.parent.document.getElementById('recap-panel') ? window.parent.document.getElementById('recap-panel').style.display='none' : window.close()">✕ Fermer</button>
+</div>
+
+<script>
+// ── Etat ────────────────────────────────────────────────────
+var targetDate = new Date();
+targetDate.setDate(1);
+// Par défaut : mois précédent
+targetDate.setMonth(targetDate.getMonth() - 1);
+
+var MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+var MOIS_FR_GEN = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+
+// ── Navigation ───────────────────────────────────────────────
+function changeMois(delta) {
+  targetDate.setMonth(targetDate.getMonth() + delta);
+  render();
+}
+
+// ── Helpers date ─────────────────────────────────────────────
+function yyyymm(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function fmtDate(s) {
+  if (!s) return '';
+  try { return new Date(s + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric', month:'short'}); }
+  catch(e) { return s; }
+}
+function daysInMonth(y, m) { return new Date(y, m+1, 0).getDate(); }
+function padM(n) { return String(n).padStart(2,'0'); }
+
+// ── Lecture données ──────────────────────────────────────────
+function getMonthDays(y, m) {
+  var days = [];
+  var n = daysInMonth(y, m);
+  for (var i = 1; i <= n; i++) days.push({ y:y, m:m+1, d:i });
+  return days;
+}
+
+function hydraStats(y, m) {
+  var days = getMonthDays(y, m-1);
+  var total = 0, joursData = 0, joursObjectif = 0, max = 0;
+  var objectif = 8;
+  days.forEach(function(day) {
+    var key = 'hydratation_' + day.y + '_' + day.m + '_' + day.d;
+    var val = localStorage.getItem(key);
+    if (!val) return;
+    var arr = JSON.parse(val);
+    var count = arr.filter(Boolean).length;
+    if (count > 0) { total += count; joursData++; if (count >= objectif) joursObjectif++; if (count > max) max = count; }
+  });
+  return { total, joursData, joursObjectif, max, objectif,
+    moyenne: joursData ? Math.round(total / joursData * 10) / 10 : 0 };
+}
+
+function pilulierStats(y, m) {
+  var meds = JSON.parse(localStorage.getItem('pilulierMeds') || '[]');
+  if (!meds.length) return null;
+  var days = getMonthDays(y, m-1);
+  var joursOK = 0, joursMissed = 0;
+  days.forEach(function(day) {
+    var key = 'pilulier_' + day.y + '_' + day.m + '_' + day.d;
+    var val = localStorage.getItem(key);
+    if (!val) return;
+    var checked = JSON.parse(val);
+    var totalPrises = meds.reduce(function(s, med) { return s + (med.prises || 1); }, 0);
+    var doneCount = Object.keys(checked).filter(function(k) { return checked[k]; }).length;
+    if (doneCount >= totalPrises) joursOK++; else joursMissed++;
+  });
+  return { meds, joursOK, joursMissed };
+}
+
+function mouvementStats(y, m) {
+  var history = JSON.parse(localStorage.getItem('mouvementHistory') || '{}');
+  var prefix = y + '-' + padM(m) + '-';
+  var stats = { velo: { jours: 0, km: 0 }, marche: 0, danse: 0, yoga: 0, sport: 0, lever: 0 };
+  Object.entries(history).forEach(function(entry) {
+    if (!entry[0].startsWith(prefix)) return;
+    var data = entry[1];
+    if (data.velo && data.velo.done) { stats.velo.jours++; stats.velo.km += parseFloat(data.velo.km) || 0; }
+    if (data.marche) stats.marche++;
+    if (data.danse) stats.danse++;
+    if (data.yoga) stats.yoga++;
+    if (data.sport) stats.sport++;
+    if (data.lever) stats.lever++;
+  });
+  return stats;
+}
+
+function veloEquiv(km) {
+  var villes = [
+    { name: 'Paris → Lyon', km: 465 },
+    { name: 'Paris → Bordeaux', km: 580 },
+    { name: 'Paris → Marseille', km: 775 },
+    { name: 'Paris → Madrid', km: 1270 },
+    { name: 'Paris → Rome', km: 1430 },
+  ];
+  var found = null;
+  for (var i = villes.length - 1; i >= 0; i--) {
+    if (km >= villes[i].km * 0.8) { found = villes[i]; break; }
+  }
+  if (!found && km > 50) found = { name: 'Paris → quelques villes de banlieue', km: km };
+  return found;
+}
+
+function evenementsMonth(y, m) {
+  var events = JSON.parse(localStorage.getItem('plannerEvents') || '{}');
+  var prefix = y + '-' + padM(m) + '-';
+  var result = [];
+  Object.entries(events).forEach(function(entry) {
+    if (!entry[0].startsWith(prefix)) return;
+    if (!Array.isArray(entry[1])) return;
+    entry[1].forEach(function(evt) {
+      if (evt.text && evt.text.trim()) result.push({ date: entry[0], text: evt.text });
+    });
+  });
+  result.sort(function(a,b) { return a.date.localeCompare(b.date); });
+  return result;
+}
+
+function exposMonth(y, m) {
+  var expos = JSON.parse(localStorage.getItem('exposData') || '[]');
+  var prefix = y + '-' + padM(m);
+  return expos.filter(function(e) {
+    var d = e.dates || {};
+    return (d.depot||'').startsWith(prefix) ||
+           (d.vernissage||'').startsWith(prefix) ||
+           (d.decrochage||'').startsWith(prefix) ||
+           (d.demo||'').startsWith(prefix) ||
+           // expo en cours ce mois
+           ((d.depot||d.vernissage||'') <= prefix+'-31' && (d.decrochage||'') >= prefix+'-01');
+  });
+}
+
+function cultureMonth(y, m) {
+  // On prend ce qui est "vu/lu/termine" — pas de date dans les items culture
+  // On retourne tout ce qui est dans un statut final
+  var data = JSON.parse(localStorage.getItem('cultureData') || '{}');
+  var STATUTS_FINIS = ['vu','lu','écouté'];
+  var result = {};
+  var CATS = [
+    { id:'films', label:'Films', emoji:'🎬' },
+    { id:'series', label:'Séries', emoji:'📺' },
+    { id:'livres', label:'Livres', emoji:'📚' },
+    { id:'spectacles', label:'Spectacles', emoji:'🎭' },
+    { id:'musique', label:'Musique', emoji:'🎵' },
+    { id:'podcasts', label:'Podcasts', emoji:'🎙️' },
+  ];
+  CATS.forEach(function(cat) {
+    var items = data[cat.id] || [];
+    var finis = items.filter(function(i) { return STATUTS_FINIS.indexOf(i.statut) >= 0; });
+    var enCours = items.filter(function(i) { return i.statut === 'en cours'; });
+    if (finis.length || enCours.length) result[cat.id] = { label: cat.label, emoji: cat.emoji, finis, enCours };
+  });
+  return result;
+}
+
+function universMonth(y, m) {
+  var data = JSON.parse(localStorage.getItem('univers2') || '{"galaxies":[],"planetes":[],"eclats":[],"cours":[]}');
+  var prefix = y + '-' + padM(m);
+  var eclats = (data.eclats || []).filter(function(e) { return (e.date||'').startsWith(prefix); });
+  var seances = [];
+  (data.cours || []).forEach(function(c) {
+    (c.seances || []).forEach(function(s) {
+      if ((s.date||'').startsWith(prefix)) {
+        var p = data.planetes.find(function(p) { return p.id === c.pid; });
+        var g = p ? data.galaxies.find(function(g) { return g.id === p.gid; }) : null;
+        seances.push({ cours: c.titre, planete: p ? p.nom : '', galaxie: g ? g.nom : '', date: s.date, notes: s.notes, couleur: g ? g.couleur : '#a78bfa' });
+      }
+    });
+  });
+  eclats.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); });
+  seances.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); });
+  return { eclats, seances, data };
+}
+
+function getPlaneteName(data, pids) {
+  return (pids||[]).map(function(pid) {
+    var p = data.planetes.find(function(x) { return x.id === pid; });
+    return p ? p.nom : '';
+  }).filter(Boolean).join(', ');
+}
+
+// ── RENDU ────────────────────────────────────────────────────
+function render() {
+  var y = targetDate.getFullYear();
+  var m = targetDate.getMonth() + 1;
+  var mNom = MOIS_FR[m-1];
+
+  document.getElementById('titre-mois').textContent = mNom + ' ' + y;
+  document.getElementById('nav-label').textContent = mNom + ' ' + y;
+
+  var html = '';
+
+  // ── 1. HYDRATATION ──────────────────────────────────────────
+  var h = hydraStats(y, m);
+  if (h.joursData > 0) {
+    html += section('💧', 'Hydratation', function() {
+      var pct = Math.round(h.joursObjectif / h.joursData * 100);
+      var s = '';
+      s += '<div class="stats-grid">';
+      s += statBox(h.moyenne, 'verres / jour en moyenne');
+      s += statBox(h.joursObjectif, 'jours à ' + h.objectif + ' verres');
+      s += statBox(h.joursData, 'jours trackés');
+      s += '</div>';
+      s += '<div class="bar-wrap"><div class="bar-label"><span>Objectif atteint</span><span>' + pct + '%</span></div><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div></div>';
+      s += '<p class="prose" style="margin-top:12px;">';
+      if (h.moyenne >= 7) s += 'Belle hydratation ce mois-ci, avec une moyenne de <strong>' + h.moyenne + ' verres</strong> par jour.';
+      else if (h.moyenne >= 5) s += 'Hydratation correcte — <strong>' + h.moyenne + ' verres</strong> en moyenne. Quelques jours à améliorer.';
+      else s += 'Ce mois-ci, la moyenne était de <strong>' + h.moyenne + ' verres</strong> par jour. Un peu plus d\'eau le mois prochain ?';
+      if (h.joursObjectif === h.joursData) s += ' Objectif atteint chaque jour tracké — excellent !';
+      s += '</p>';
+      return s;
+    });
+  }
+
+  // ── 2. MEDICAMENTS ──────────────────────────────────────────
+  var pil = pilulierStats(y, m);
+  if (pil) {
+    html += section('💊', 'Médicaments', function() {
+      var s = '';
+      s += '<div class="stats-grid">';
+      s += statBox(pil.joursOK, 'jours complets');
+      if (pil.joursMissed > 0) s += statBox(pil.joursMissed, 'jours incomplets');
+      s += '</div>';
+      s += '<p class="prose" style="margin-top:4px;">';
+      var meds = pil.meds.map(function(m) { return m.nom; }).join(', ');
+      if (pil.joursMissed === 0) s += 'Tous les médicaments ont été pris chaque jour tracké. <strong>Parfait.</strong>';
+      else s += '<strong>' + pil.joursOK + ' jours</strong> complets, <strong>' + pil.joursMissed + ' jours</strong> avec des prises manquantes.';
+      s += '</p>';
+      return s;
+    });
+  }
+
+  // ── 3. MOUVEMENT ────────────────────────────────────────────
+  var mv = mouvementStats(y, m);
+  var mvTotal = mv.velo.jours + mv.marche + mv.danse + mv.yoga + mv.sport + mv.lever;
+  if (mvTotal > 0) {
+    html += section('🏃‍♀️', 'Mouvement', function() {
+      var s = '<div class="stats-grid">';
+      if (mv.velo.jours > 0) s += statBox(Math.round(mv.velo.km), 'km à vélo');
+      if (mv.marche > 0) s += statBox(mv.marche, 'j. de marche');
+      if (mv.danse > 0) s += statBox(mv.danse, 'j. de danse');
+      if (mv.yoga > 0) s += statBox(mv.yoga, 'j. de yoga');
+      if (mv.sport > 0) s += statBox(mv.sport, 'j. de sport');
+      if (mv.lever > 0) s += statBox(mv.lever, 'matins levée');
+      s += '</div>';
+      if (mv.velo.km > 0) {
+        var eq = veloEquiv(mv.velo.km);
+        if (eq) s += '<div class="velo-equiv">🗺️ ' + Math.round(mv.velo.km) + ' km à vélo ce mois-ci — soit environ ' + Math.round(mv.velo.km / eq.km * 100) + '% du trajet ' + eq.name + '.</div>';
+      }
+      return s;
+    });
+  }
+
+  // ── 4. EVENEMENTS ───────────────────────────────────────────
+  var evts = evenementsMonth(y, m);
+  if (evts.length > 0) {
+    html += section('📅', 'Agenda', function() {
+      var s = '<div class="day-list">';
+      // Grouper par jour
+      var byDay = {};
+      evts.forEach(function(e) { if (!byDay[e.date]) byDay[e.date] = []; byDay[e.date].push(e.text); });
+      Object.entries(byDay).forEach(function(entry) {
+        var d = new Date(entry[0] + 'T00:00:00');
+        var label = d.toLocaleDateString('fr-FR', {weekday:'short', day:'numeric', month:'short'});
+        s += '<div class="day-item"><div class="day-dt">' + label + '</div><div class="day-evts">' + entry[1].map(esc).join('<br>') + '</div></div>';
+      });
+      s += '</div>';
+      return s;
+    });
+  }
+
+  // ── 5. EXPOSITIONS ──────────────────────────────────────────
+  var expos = exposMonth(y, m);
+  if (expos.length > 0) {
+    html += section('🖼️', 'Expositions', function() {
+      var s = '<ul class="item-list">';
+      expos.forEach(function(e) {
+        var d = e.dates || {};
+        var infos = [];
+        if (d.vernissage) infos.push('Vernissage ' + fmtDate(d.vernissage));
+        if (d.decrochage) infos.push('Retrait ' + fmtDate(d.decrochage));
+        s += '<li><div class="dot"></div><div><strong>' + esc(e.nom) + '</strong>' + (e.lieu ? ' — ' + esc(e.lieu) : '') + (infos.length ? '<br><span style="font-size:11px;color:var(--muted);">' + infos.join(' · ') + '</span>' : '') + '</div></li>';
+      });
+      s += '</ul>';
+      return s;
+    });
+  }
+
+  // ── 6. CULTURE ──────────────────────────────────────────────
+  var cult = cultureMonth(y, m);
+  if (Object.keys(cult).length > 0) {
+    html += section('🎬', 'Culture', function() {
+      var s = '';
+      Object.values(cult).forEach(function(cat) {
+        if (cat.finis.length || cat.enCours.length) {
+          s += '<div style="margin-bottom:14px;"><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;">' + cat.emoji + ' ' + cat.label + '</div>';
+          s += '<div class="pills">';
+          cat.finis.forEach(function(i) { s += '<span class="pill done">' + esc(i.titre||i.nom||'Sans titre') + '</span>'; });
+          cat.enCours.forEach(function(i) { s += '<span class="pill en-cours">En cours — ' + esc(i.titre||i.nom||'Sans titre') + '</span>'; });
+          s += '</div></div>';
+        }
+      });
+      return s;
+    });
+  }
+
+  // ── 7. UNIVERS DE CONNAISSANCE ──────────────────────────────
+  var univ = universMonth(y, m);
+  if (univ.eclats.length || univ.seances.length) {
+    html += section('✨', 'Univers de connaissance', function() {
+      var s = '';
+      if (univ.seances.length) {
+        s += '<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Séances de cours</div>';
+        univ.seances.forEach(function(se) {
+          s += '<div class="eclat-item" style="border-left-color:' + se.couleur + ';">';
+          s += '<strong>' + esc(se.cours) + '</strong>';
+          if (se.planete) s += ' <span style="color:var(--muted);font-size:11px;">· ' + esc(se.galaxie) + ' / ' + esc(se.planete) + '</span>';
+          if (se.notes) s += '<div class="eclat-meta">' + esc(se.notes.slice(0, 100)) + (se.notes.length > 100 ? '...' : '') + '</div>';
+          s += '<div class="eclat-meta">' + fmtDate(se.date) + '</div>';
+          s += '</div>';
+        });
+        if (univ.eclats.length) s += '<div style="height:16px;"></div>';
+      }
+      if (univ.eclats.length) {
+        s += '<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Éclats notés</div>';
+        univ.eclats.forEach(function(e) {
+          var pNom = getPlaneteName(univ.data, e.pids);
+          s += '<div class="eclat-item">';
+          s += esc(e.texte);
+          s += '<div class="eclat-meta">' + (pNom ? esc(pNom) + ' · ' : '') + fmtDate(e.date) + '</div>';
+          s += '</div>';
+        });
+      }
+      return s;
+    });
+  }
+
+  if (!html) {
+    html = '<div class="no-data">Aucune donnée trouvée pour ' + MOIS_FR_GEN[m-1] + ' ' + y + '.<br>Les données sont lues depuis cette application.</div>';
+  }
+
+  document.getElementById('recap-body').innerHTML = html;
+}
+
+function section(icon, titre, contentFn) {
+  return '<div class="section">' +
+    '<div class="section-title"><span class="section-icon">' + icon + '</span>' + titre + '</div>' +
+    contentFn() +
+    '</div>';
+}
+
+function statBox(val, lbl) {
+  return '<div class="stat-box"><div class="stat-val">' + val + '</div><div class="stat-lbl">' + lbl + '</div></div>';
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── EXPORT TEXTE ─────────────────────────────────────────────
+function copyText() {
+  var y = targetDate.getFullYear();
+  var m = targetDate.getMonth() + 1;
+  var lines = ['RÉCAP ' + MOIS_FR[m-1].toUpperCase() + ' ' + y, ''];
+
+  var h = hydraStats(y, m);
+  if (h.joursData > 0) {
+    lines.push('HYDRATATION');
+    lines.push('Moyenne : ' + h.moyenne + ' verres/jour');
+    lines.push('Jours à objectif : ' + h.joursObjectif + '/' + h.joursData);
+    lines.push('');
+  }
+
+  var pil = pilulierStats(y, m);
+  if (pil) {
+    lines.push('MÉDICAMENTS');
+    lines.push('Jours complets : ' + pil.joursOK);
+    if (pil.joursMissed > 0) lines.push('Jours manqués : ' + pil.joursMissed);
+    lines.push('');
+  }
+
+  var mv = mouvementStats(y, m);
+  if (mv.velo.jours + mv.marche + mv.danse + mv.yoga + mv.sport > 0) {
+    lines.push('MOUVEMENT');
+    if (mv.velo.km > 0) lines.push('Vélo : ' + Math.round(mv.velo.km) + ' km en ' + mv.velo.jours + ' sorties');
+    if (mv.marche > 0) lines.push('Marche : ' + mv.marche + ' jours');
+    if (mv.danse > 0) lines.push('Danse : ' + mv.danse + ' jours');
+    if (mv.yoga > 0) lines.push('Yoga : ' + mv.yoga + ' jours');
+    if (mv.sport > 0) lines.push('Sport : ' + mv.sport + ' jours');
+    lines.push('');
+  }
+
+  var evts = evenementsMonth(y, m);
+  if (evts.length > 0) {
+    lines.push('AGENDA');
+    evts.forEach(function(e) { lines.push('- ' + fmtDate(e.date) + ' : ' + e.text); });
+    lines.push('');
+  }
+
+  var univ = universMonth(y, m);
+  if (univ.seances.length || univ.eclats.length) {
+    lines.push('UNIVERS DE CONNAISSANCE');
+    univ.seances.forEach(function(s) { lines.push('- ' + s.cours + ' (' + s.planete + ') — ' + fmtDate(s.date)); });
+    univ.eclats.forEach(function(e) { lines.push('* ' + e.texte); });
+    lines.push('');
+  }
+
+  navigator.clipboard.writeText(lines.join('\n')).then(function() {
+    var btn = document.querySelector('.btn-copy');
+    btn.textContent = '✓ Copié !';
+    setTimeout(function() { btn.textContent = '📋 Copier le texte'; }, 2000);
+  });
+}
+
+// ── Init ─────────────────────────────────────────────────────
+window.addEventListener('load', function() { render(); });
+</script>
+</body>
+</html>
