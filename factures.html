@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factures</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#07080f;color:#e8e9f0;font-family:system-ui,sans-serif;height:100vh;overflow:hidden;}
+
+header{position:fixed;top:0;left:0;right:0;z-index:200;height:48px;background:rgba(7,8,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;padding:0 16px;gap:8px;}
+.nav-btn{padding:4px 13px;border-radius:14px;border:none;background:none;color:#6b7089;font-size:12px;cursor:pointer;font-family:system-ui;transition:all .18s;}
+.nav-btn.on{background:rgba(255,255,255,0.08);color:#e8e9f0;}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.hdr-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#e8e9f0;font-size:12px;padding:5px 12px;cursor:pointer;font-family:system-ui;transition:all .18s;}
+.hdr-btn:hover{background:rgba(255,255,255,0.1);}
+.hdr-btn.primary{background:rgba(74,222,128,0.15);border-color:rgba(74,222,128,0.3);color:#4ade80;}
+.hdr-btn.primary:hover{background:rgba(74,222,128,0.22);}
+
+/* MAIN */
+#main{position:fixed;inset:0;top:48px;overflow-y:auto;padding:20px;}
+.inner{max-width:820px;margin:0 auto;}
+
+/* ALERTES */
+#alertes{margin-bottom:18px;}
+.alerte{display:flex;align-items:flex-start;gap:12px;background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.alerte.relance{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.2);}
+.alerte-ico{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alerte-body{flex:1;}
+.alerte-titre{font-size:13px;font-weight:600;margin-bottom:2px;}
+.alerte-sub{font-size:11px;color:#9ca3af;}
+.alerte-btn{background:none;border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:#e8e9f0;font-size:11px;padding:4px 10px;cursor:pointer;font-family:system-ui;flex-shrink:0;margin-top:2px;}
+.alerte-btn:hover{background:rgba(255,255,255,0.07);}
+
+/* SECTION */
+.section-titre{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6b7089;margin-bottom:10px;margin-top:24px;}
+
+/* CARTES PRESTATIONS */
+.prestation{background:#0c0d1a;border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:14px 16px;margin-bottom:8px;transition:all .18s;cursor:pointer;}
+.prestation:hover{border-color:rgba(255,255,255,0.14);background:#0e0f1e;}
+.prestation-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.prestation-type{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+.prestation-type.mix{background:rgba(167,139,250,0.15);color:#a78bfa;}
+.prestation-type.cours{background:rgba(56,189,248,0.15);color:#38bdf8;}
+.prestation-type.autre{background:rgba(156,163,175,0.15);color:#9ca3af;}
+.prestation-nom{font-size:14px;font-weight:600;flex:1;}
+.prestation-statut{font-size:10px;padding:2px 8px;border-radius:6px;}
+.prestation-statut.brouillon{background:rgba(156,163,175,0.12);color:#9ca3af;}
+.prestation-statut.emise{background:rgba(251,191,36,0.12);color:#fbbf24;}
+.prestation-statut.payee{background:rgba(74,222,128,0.12);color:#4ade80;}
+.prestation-statut.relance{background:rgba(248,113,113,0.12);color:#f87171;}
+.prestation-bot{display:flex;align-items:center;gap:14px;font-size:11px;color:#6b7089;}
+.prestation-montant{font-size:15px;font-weight:700;color:#e8e9f0;margin-left:auto;}
+
+/* VIDE */
+.empty{text-align:center;padding:48px 20px;color:#6b7089;font-size:13px;}
+.empty-ico{font-size:36px;margin-bottom:10px;}
+
+/* OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:400;display:flex;align-items:flex-end;justify-content:center;}
+@media(min-width:600px){.overlay{align-items:center;}}
+.modal{background:#0e0f1e;border:1px solid rgba(255,255,255,0.1);border-radius:16px 16px 0 0;padding:22px 20px 32px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;}
+@media(min-width:600px){.modal{border-radius:16px;}}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:18px;}
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:11px;color:#9ca3af;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;}
+.fg input,.fg select,.fg textarea{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 12px;color:#e8e9f0;font-size:13px;font-family:system-ui;outline:none;transition:border-color .18s;}
+.fg input:focus,.fg select,.fg textarea:focus{border-color:rgba(255,255,255,0.24);}
+.fg select{cursor:pointer;}
+.fg select option{background:#0e0f1e;}
+.fg textarea{resize:vertical;min-height:72px;}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+.bok{flex:1;padding:10px;background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.3);border-radius:8px;color:#4ade80;font-size:13px;cursor:pointer;font-family:system-ui;transition:all .18s;}
+.bok:hover{background:rgba(74,222,128,0.22);}
+.bcan{padding:10px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#9ca3af;font-size:13px;cursor:pointer;font-family:system-ui;}
+.bdel{padding:10px 14px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;color:#f87171;font-size:13px;cursor:pointer;font-family:system-ui;}
+.sep{height:1px;background:rgba(255,255,255,0.06);margin:14px 0;}
+.hint{font-size:11px;color:#6b7089;margin-top:4px;}
+
+/* CLIENT CHIPS */
+.client-list{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;margin-bottom:8px;}
+.client-chip{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:7px;padding:7px 10px;cursor:pointer;font-size:12px;transition:all .15s;display:flex;align-items:center;justify-content:space-between;}
+.client-chip:hover,.client-chip.on{background:rgba(74,222,128,0.08);border-color:rgba(74,222,128,0.3);color:#4ade80;}
+.client-chip-nom{font-weight:500;}
+.client-chip-sub{font-size:10px;color:#6b7089;}
+.client-chip.on .client-chip-sub{color:#4ade80;opacity:.7;}
+.new-client-toggle{font-size:11px;color:#6b7089;cursor:pointer;text-decoration:underline;margin-top:4px;display:inline-block;}
+.new-client-form{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px;margin-top:8px;}
+.new-client-form .fg{margin-bottom:8px;}
+.new-client-form .fg:last-child{margin-bottom:0;}
+
+/* FACTURE IMPRIMABLE */
+#print-view{display:none;position:fixed;inset:0;background:#fff;z-index:500;overflow-y:auto;padding:40px;}
+.facture-doc{max-width:680px;margin:0 auto;font-family:system-ui,sans-serif;color:#111;font-size:13px;line-height:1.6;}
+.facture-doc h1{font-size:22px;font-weight:700;color:#111;margin-bottom:4px;}
+.facture-doc .f-meta{color:#555;font-size:12px;margin-bottom:28px;}
+.f-parties{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}
+.f-partie h4{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:6px;}
+.f-partie p{font-size:12px;line-height:1.7;color:#333;}
+.f-table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+.f-table th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#888;border-bottom:2px solid #e5e7eb;padding:6px 8px;text-align:left;}
+.f-table td{padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:13px;}
+.f-table .f-total td{font-weight:700;border-bottom:none;font-size:14px;}
+.f-mentions{font-size:10px;color:#888;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:14px;}
+.print-actions{display:flex;gap:10px;margin-bottom:24px;}
+.print-actions button{padding:8px 16px;border-radius:8px;border:none;font-size:13px;cursor:pointer;font-family:system-ui;}
+.print-btn{background:#111;color:#fff;}
+.close-print-btn{background:#f3f4f6;color:#111;}
+
+/* MAIL RELANCE */
+#mail-view{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.mail-modal{background:#0e0f1e;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:22px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;}
+.mail-modal h3{font-size:15px;font-weight:600;margin-bottom:14px;}
+.mail-field{margin-bottom:12px;}
+.mail-field label{font-size:10px;color:#6b7089;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px;}
+.mail-field .val{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:7px;padding:8px 12px;font-size:12px;color:#e8e9f0;white-space:pre-wrap;line-height:1.6;}
+.copy-btn{width:100%;padding:10px;background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.25);border-radius:8px;color:#4ade80;font-size:13px;cursor:pointer;font-family:system-ui;margin-top:4px;transition:all .18s;}
+.copy-btn:hover{background:rgba(74,222,128,0.2);}
+
+/* BILAN */
+.bilan-nav{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.bilan-nav button{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#e8e9f0;font-size:13px;padding:5px 12px;cursor:pointer;font-family:system-ui;transition:all .18s;}
+.bilan-nav button:hover{background:rgba(255,255,255,0.1);}
+.bilan-nav .periode{font-size:15px;font-weight:600;min-width:130px;text-align:center;}
+.bilan-nav button.on{background:rgba(74,222,128,0.12);border-color:rgba(74,222,128,0.3);color:#4ade80;}
+.bilan-table-wrap{overflow-x:auto;margin-bottom:24px;}
+.bilan-table{width:100%;border-collapse:collapse;font-size:12px;min-width:700px;}
+.bilan-table th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7089;border-bottom:1px solid rgba(255,255,255,0.08);padding:8px 10px;text-align:left;white-space:nowrap;}
+.bilan-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle;}
+.bilan-table tr:hover td{background:rgba(255,255,255,0.02);}
+.bilan-table .num{text-align:right;font-variant-numeric:tabular-nums;}
+.bilan-table .total-row td{border-top:1px solid rgba(255,255,255,0.12);font-weight:700;font-size:13px;padding-top:12px;}
+.bilan-table .net-row td{border-top:2px solid rgba(74,222,128,0.3);font-weight:700;font-size:14px;color:#4ade80;padding-top:12px;}
+.bilan-section{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#6b7089;margin:20px 0 10px;}
+.frais-ligne{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.frais-ligne input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 10px;color:#e8e9f0;font-size:12px;font-family:system-ui;outline:none;}
+.frais-ligne input:focus{border-color:rgba(255,255,255,0.2);}
+.frais-ligne .fi-nom{flex:1;}
+.frais-ligne .fi-mt{width:90px;text-align:right;}
+.frais-ligne .fi-del{background:none;border:none;color:#6b7089;cursor:pointer;font-size:14px;padding:4px;transition:color .15s;}
+.frais-ligne .fi-del:hover{color:#f87171;}
+.add-frais-btn{background:none;border:1px dashed rgba(255,255,255,0.1);border-radius:6px;color:#6b7089;font-size:11px;padding:6px 12px;cursor:pointer;font-family:system-ui;transition:all .18s;margin-top:4px;}
+.add-frais-btn:hover{border-color:#4ade80;color:#4ade80;}
+.bilan-annuel table{width:100%;border-collapse:collapse;font-size:11px;}
+.bilan-annuel th{font-size:10px;color:#6b7089;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:right;}
+.bilan-annuel th:first-child{text-align:left;}
+.bilan-annuel td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;font-variant-numeric:tabular-nums;}
+.bilan-annuel td:first-child{text-align:left;font-weight:500;}
+.bilan-annuel .net-pos{color:#4ade80;}
+.bilan-annuel .net-neg{color:#f87171;}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1c2e;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 18px;font-size:12px;opacity:0;transition:all .3s;z-index:900;pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media print{
+  body{background:#fff;}
+  header,#main,#print-view .print-actions{display:none!important;}
+  #print-view{display:block!important;position:static;padding:0;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <button class="nav-btn on" id="tab-prest" onclick="showTab('prestations')">Prestations</button>
+  <button class="nav-btn" id="tab-clients" onclick="showTab('clients')">Clients</button>
+  <button class="nav-btn" id="tab-bilan" onclick="showTab('bilan')">Bilan</button>
+  <button class="nav-btn" id="tab-profil" onclick="showTab('profil')">Mon profil</button>
+  <div class="hdr-right">
+    <button class="hdr-btn primary" onclick="openNouvellePrestation()">+ Prestation</button>
+  </div>
+</header>
+
+<div id="main">
+  <div class="inner">
+    <div id="alertes"></div>
+    <div id="tab-content"></div>
+  </div>
+</div>
+
+<!-- MODAL PRESTATION -->
+<div class="overlay" id="m-prest" style="display:none" onclick="if(event.target===this)hide('m-prest')">
+  <div class="modal">
+    <h3 id="mp-titre">Nouvelle prestation</h3>
+    <div class="fg-row">
+      <div class="fg">
+        <label>Type</label>
+        <select id="mp-type">
+          <option value="mix">🎧 Mix / DJ Set</option>
+          <option value="cours">🎓 Cours</option>
+          <option value="autre">✦ Autre</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Date de la prestation *</label>
+        <input type="date" id="mp-date">
+      </div>
+    </div>
+    <div class="fg">
+      <label>Nom / description *</label>
+      <input type="text" id="mp-nom" placeholder="Mix au Rex Club, Cours techniques DJ...">
+    </div>
+    <div class="fg-row">
+      <div class="fg">
+        <label>Montant cachet (€)</label>
+        <input type="number" id="mp-montant" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="fg">
+        <label>Frais transport (€)</label>
+        <input type="number" id="mp-frais" placeholder="0" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="fg">
+      <label>Client</label>
+      <div class="client-list" id="mp-clients-list"></div>
+      <span class="new-client-toggle" id="mp-new-toggle" onclick="toggleNewClient()">+ Nouveau client</span>
+      <div class="new-client-form" id="mp-new-form" style="display:none">
+        <div class="fg"><label>Nom / Raison sociale *</label><input type="text" id="nc-nom" placeholder="Association Rex, Studio 54..."></div>
+        <div class="fg"><label>SIRET</label><input type="text" id="nc-siret" placeholder="12345678901234"></div>
+        <div class="fg"><label>Adresse</label><input type="text" id="nc-adresse" placeholder="12 rue de la Paix, 75001 Paris"></div>
+        <div class="fg"><label>Email contact</label><input type="email" id="nc-email" placeholder="contact@rex.fr"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Notes internes</label>
+      <textarea id="mp-notes" placeholder="Infos pratiques, conditions, remarques..."></textarea>
+    </div>
+    <div class="actions">
+      <button class="bok" onclick="savePrestation()">Enregistrer</button>
+      <button class="bcan" onclick="hide('m-prest')">Annuler</button>
+      <button class="bdel" id="mp-del" style="display:none" onclick="delPrestation()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLIENT -->
+<div class="overlay" id="m-client" style="display:none" onclick="if(event.target===this)hide('m-client')">
+  <div class="modal">
+    <h3 id="mc-titre">Nouveau client</h3>
+    <div class="fg"><label>Nom / Raison sociale *</label><input type="text" id="mc-nom" placeholder="Association Rex..."></div>
+    <div class="fg"><label>SIRET</label><input type="text" id="mc-siret" placeholder="12345678901234"></div>
+    <div class="fg"><label>Adresse complète</label><textarea id="mc-adresse" placeholder="12 rue de la Paix&#10;75001 Paris"></textarea></div>
+    <div class="fg"><label>Email contact</label><input type="email" id="mc-email" placeholder="contact@lieu.fr"></div>
+    <div class="fg"><label>Téléphone</label><input type="tel" id="mc-tel" placeholder="06 12 34 56 78"></div>
+    <div class="actions">
+      <button class="bok" onclick="saveClient()">Enregistrer</button>
+      <button class="bcan" onclick="hide('m-client')">Annuler</button>
+      <button class="bdel" id="mc-del" style="display:none" onclick="delClient()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- VUE FACTURE IMPRIMABLE -->
+<div id="print-view">
+  <div class="facture-doc">
+    <div class="print-actions">
+      <button class="print-btn" onclick="window.print()">🖨 Imprimer / PDF</button>
+      <button class="close-print-btn" onclick="closePrint()">← Retour</button>
+    </div>
+    <div id="print-content"></div>
+  </div>
+</div>
+
+<!-- VUE MAIL RELANCE -->
+<div id="mail-view" style="display:none;flex-direction:column">
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,.8)" onclick="closeMail()"></div>
+  <div class="mail-modal" style="position:relative;z-index:1;margin:auto">
+    <h3>✉️ Mail de relance</h3>
+    <div class="mail-field"><label>À</label><div class="val" id="mail-to"></div></div>
+    <div class="mail-field"><label>Objet</label><div class="val" id="mail-objet"></div></div>
+    <div class="mail-field"><label>Corps</label><div class="val" id="mail-corps"></div></div>
+    <button class="copy-btn" onclick="copyMail()">📋 Copier le mail</button>
+    <button class="bcan" style="width:100%;margin-top:8px" onclick="closeMail()">Fermer</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── DATA ─────────────────────────────────────────────────────
+function load(){
+  var def={profil:{},clients:[],prestations:[]};
+  try{return JSON.parse(localStorage.getItem('facturesData')||'null')||def;}catch(e){return def;}
+}
+function save(d){
+  localStorage.setItem('facturesData',JSON.stringify(d));
+  try{window.parent.postMessage({type:'factures-updated'},'*');}catch(e){}
+}
+
+// ─── UTILS ───────────────────────────────────────────────────
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function today(){return new Date().toISOString().slice(0,10);}
+function fmtDate(s){if(!s)return '';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function fmtMontant(n){return parseFloat(n||0).toFixed(2).replace('.',',')+'€';}
+function nextMonday(dateStr){
+  var d=new Date(dateStr);
+  // Avancer d'au moins 3 jours pour ne pas émettre le jour même ou le lendemain
+  d.setDate(d.getDate()+3);
+  // Trouver le lundi suivant
+  var day=d.getDay(); // 0=dim, 1=lun...
+  var toMonday=day===1?0:(day===0?1:8-day);
+  d.setDate(d.getDate()+toMonday);
+  return d.toISOString().slice(0,10);
+}
+function daysDiff(dateStr){
+  if(!dateStr) return 0;
+  var d=new Date(dateStr);
+  var now=new Date();
+  return Math.floor((now-d)/(1000*60*60*24));
+}
+function genNumero(){
+  var d=load();
+  var year=new Date().getFullYear();
+  var existing=d.prestations.filter(function(p){return p.numero&&p.numero.startsWith(year+'-');});
+  var max=existing.reduce(function(m,p){
+    var n=parseInt((p.numero.split('-')[1]||'0'));
+    return Math.max(m,n);
+  },0);
+  return year+'-'+String(max+1).padStart(3,'0');
+}
+
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2200);
+}
+function show(id){document.getElementById(id).style.display='flex';}
+function hide(id){document.getElementById(id).style.display='none';}
+
+// ─── TABS ────────────────────────────────────────────────────
+var curTab='prestations';
+function showTab(tab){
+  curTab=tab;
+  ['prest','clients','bilan','profil'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.remove('on');
+  });
+  var tabId=tab==='prestations'?'prest':tab;
+  document.getElementById('tab-'+tabId).classList.add('on');
+  renderAlertes();
+  if(tab==='prestations') renderPrestations();
+  else if(tab==='clients') renderClients();
+  else if(tab==='bilan') renderBilan();
+  else renderProfil();
+}
+
+// ─── ALERTES ─────────────────────────────────────────────────
+function renderAlertes(){
+  var d=load();
+  var todayStr=today();
+  var html='';
+
+  d.prestations.forEach(function(p){
+    // Facture à émettre : date lundi passée, statut brouillon
+    if(p.statut==='brouillon'&&p.dateLundi&&p.dateLundi<=todayStr){
+      html+='<div class="alerte">'+
+        '<div class="alerte-ico">📄</div>'+
+        '<div class="alerte-body">'+
+        '<div class="alerte-titre">Facture à émettre — '+esc(p.nom)+'</div>'+
+        '<div class="alerte-sub">Prestation du '+fmtDate(p.date)+(p.montant?' · '+fmtMontant(p.montant):' · montant à compléter')+'</div>'+
+        '</div>'+
+        '<button class="alerte-btn" onclick="openEditPrestation(\''+p.id+'\')">Compléter</button>'+
+        '</div>';
+    }
+    // Relance : émise depuis > 30 jours, pas payée
+    if(p.statut==='emise'&&p.dateEmission){
+      var jours=daysDiff(p.dateEmission);
+      if(jours>=30){
+        html+='<div class="alerte relance">'+
+          '<div class="alerte-ico">⚠️</div>'+
+          '<div class="alerte-body">'+
+          '<div class="alerte-titre">Relance nécessaire — '+esc(p.nom)+'</div>'+
+          '<div class="alerte-sub">Facture émise il y a '+jours+' jours · '+fmtMontant((parseFloat(p.montant||0)+parseFloat(p.frais||0)))+'</div>'+
+          '</div>'+
+          '<button class="alerte-btn" onclick="showRelance(\''+p.id+'\')">Mail relance</button>'+
+          '</div>';
+      }
+    }
+  });
+
+  document.getElementById('alertes').innerHTML=html;
+}
+
+// ─── PRESTATIONS ─────────────────────────────────────────────
+function renderPrestations(){
+  var d=load();
+  var prest=d.prestations.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+
+  if(!prest.length){
+    document.getElementById('tab-content').innerHTML=
+      '<div class="empty"><div class="empty-ico">🎧</div>Aucune prestation encore.<br>Crée un événement dans le calendrier ou ajoute-en une manuellement.</div>';
+    return;
+  }
+
+  // Grouper par statut
+  var groupes={brouillon:[],emise:[],relance:[],payee:[]};
+  prest.forEach(function(p){
+    var s=p.statut||'brouillon';
+    if(s==='emise'&&p.dateEmission&&daysDiff(p.dateEmission)>=30) s='relance';
+    if(!groupes[s]) groupes[s]=[];
+    groupes[s].push(p);
+  });
+
+  var labels={brouillon:'À compléter',emise:'Émises',relance:'En retard',payee:'Payées'};
+  var html='';
+
+  ['brouillon','emise','relance','payee'].forEach(function(s){
+    var items=groupes[s];
+    if(!items||!items.length) return;
+    html+='<div class="section-titre">'+labels[s]+' ('+items.length+')</div>';
+    items.forEach(function(p){
+      var client=p.clientId?d.clients.find(function(c){return c.id===p.clientId;}):null;
+      var total=parseFloat(p.montant||0)+parseFloat(p.frais||0);
+      var statut=p.statut||'brouillon';
+      if(statut==='emise'&&p.dateEmission&&daysDiff(p.dateEmission)>=30) statut='relance';
+      html+='<div class="prestation" onclick="openEditPrestation(\''+p.id+'\')">'+
+        '<div class="prestation-top">'+
+        '<span class="prestation-type '+(p.type||'autre')+'">'+typeLabel(p.type)+'</span>'+
+        '<span class="prestation-nom">'+esc(p.nom)+'</span>'+
+        '<span class="prestation-statut '+statut+'">'+statutLabel(statut)+'</span>'+
+        '</div>'+
+        '<div class="prestation-bot">'+
+        '<span>📅 '+fmtDate(p.date)+'</span>'+
+        (client?'<span>🏠 '+esc(client.nom)+'</span>':'')+
+        (p.numero?'<span>N° '+esc(p.numero)+'</span>':'')+
+        (total>0?'<span class="prestation-montant">'+fmtMontant(total)+'</span>':'')+
+        '</div>'+
+        '</div>';
+    });
+  });
+
+  document.getElementById('tab-content').innerHTML=html;
+}
+
+function typeLabel(t){return t==='mix'?'Mix':t==='cours'?'Cours':'Autre';}
+function statutLabel(s){
+  return s==='brouillon'?'À compléter':s==='emise'?'Émise':s==='relance'?'Relance':s==='payee'?'Payée':'?';
+}
+
+// ─── EDIT PRESTATION ─────────────────────────────────────────
+var editPrestId=null;
+var selClientId=null;
+var showingNewClient=false;
+
+function openNouvellePrestation(){
+  editPrestId=null;selClientId=null;showingNewClient=false;
+  document.getElementById('mp-titre').textContent='Nouvelle prestation';
+  document.getElementById('mp-date').value=today();
+  document.getElementById('mp-nom').value='';
+  document.getElementById('mp-montant').value='';
+  document.getElementById('mp-frais').value='';
+  document.getElementById('mp-notes').value='';
+  document.getElementById('mp-type').value='mix';
+  document.getElementById('mp-del').style.display='none';
+  document.getElementById('mp-new-form').style.display='none';
+  document.getElementById('mp-new-toggle').textContent='+ Nouveau client';
+  showingNewClient=false;
+  renderClientList(null);
+  show('m-prest');
+  setTimeout(function(){document.getElementById('mp-nom').focus();},80);
+}
+
+function openEditPrestation(id){
+  var d=load();
+  var p=d.prestations.find(function(x){return x.id===id;});
+  if(!p) return;
+  editPrestId=id;selClientId=p.clientId||null;showingNewClient=false;
+  document.getElementById('mp-titre').textContent='Modifier la prestation';
+  document.getElementById('mp-date').value=p.date||today();
+  document.getElementById('mp-nom').value=p.nom||'';
+  document.getElementById('mp-montant').value=p.montant||'';
+  document.getElementById('mp-frais').value=p.frais||'';
+  document.getElementById('mp-notes').value=p.notes||'';
+  document.getElementById('mp-type').value=p.type||'mix';
+  document.getElementById('mp-del').style.display='';
+  document.getElementById('mp-new-form').style.display='none';
+  document.getElementById('mp-new-toggle').textContent='+ Nouveau client';
+  renderClientList(p.clientId||null);
+  show('m-prest');
+  // Actions contextuelles selon statut
+  renderPrestActions(p);
+}
+
+function renderPrestActions(p){
+  var old=document.getElementById('prest-actions-extra');
+  if(old) old.remove();
+  if(!p) return;
+  var statut=p.statut||'brouillon';
+  var html='<div id="prest-actions-extra" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">';
+  if(statut==='brouillon'){
+    html+='<button style="flex:1;padding:8px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25);border-radius:8px;color:#fbbf24;font-size:12px;cursor:pointer;font-family:system-ui;" onclick="emettreFact()">📄 Émettre la facture</button>';
+  }
+  if(statut==='emise'||statut==='relance'){
+    html+='<button style="flex:1;padding:8px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:8px;color:#4ade80;font-size:12px;cursor:pointer;font-family:system-ui;" onclick="marquerPaye()">✓ Marquer payée</button>';
+    html+='<button style="flex:1;padding:8px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;color:#f87171;font-size:12px;cursor:pointer;font-family:system-ui;" onclick="showRelance(\''+p.id+'\')">✉️ Mail relance</button>';
+  }
+  if(statut==='emise'||statut==='payee'){
+    html+='<button style="flex:1;padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#9ca3af;font-size:12px;cursor:pointer;font-family:system-ui;" onclick="voirFacture(\''+p.id+'\')">🖨 Voir la facture</button>';
+  }
+  html+='</div>';
+  document.querySelector('#m-prest .modal .actions').insertAdjacentHTML('afterend',html);
+}
+
+function renderClientList(selId){
+  var d=load();
+  selClientId=selId||null;
+  var html='';
+  if(!d.clients.length){html='<div style="font-size:11px;color:#6b7089;padding:4px 0;">Aucun client enregistré</div>';}
+  d.clients.forEach(function(c){
+    var on=selClientId===c.id;
+    html+='<div class="client-chip'+(on?' on':'')+'" onclick="selectClient(\''+c.id+'\')">'+
+      '<div><div class="client-chip-nom">'+esc(c.nom)+'</div>'+
+      (c.email?'<div class="client-chip-sub">'+esc(c.email)+'</div>':'')+
+      '</div>'+
+      (on?'<span>✓</span>':'')+
+      '</div>';
+  });
+  document.getElementById('mp-clients-list').innerHTML=html;
+}
+
+function selectClient(id){
+  selClientId=selClientId===id?null:id;
+  renderClientList(selClientId);
+}
+
+function toggleNewClient(){
+  showingNewClient=!showingNewClient;
+  document.getElementById('mp-new-form').style.display=showingNewClient?'block':'none';
+  document.getElementById('mp-new-toggle').textContent=showingNewClient?'↑ Masquer':'+ Nouveau client';
+  if(showingNewClient) document.getElementById('nc-nom').focus();
+}
+
+function savePrestation(){
+  var nom=document.getElementById('mp-nom').value.trim();
+  var date=document.getElementById('mp-date').value;
+  if(!nom){toast('Nom obligatoire');return;}
+  if(!date){toast('Date obligatoire');return;}
+
+  var d=load();
+  var clientId=selClientId;
+
+  // Nouveau client inline ?
+  if(showingNewClient){
+    var ncNom=document.getElementById('nc-nom').value.trim();
+    if(ncNom){
+      var nc={id:'c'+Date.now(),nom:ncNom,siret:document.getElementById('nc-siret').value.trim(),adresse:document.getElementById('nc-adresse').value.trim(),email:document.getElementById('nc-email').value.trim(),tel:''};
+      d.clients.push(nc);
+      clientId=nc.id;
+    }
+  }
+
+  if(editPrestId){
+    var p=d.prestations.find(function(x){return x.id===editPrestId;});
+    if(p){
+      p.nom=nom;p.date=date;p.type=document.getElementById('mp-type').value;
+      p.montant=document.getElementById('mp-montant').value;
+      p.frais=document.getElementById('mp-frais').value;
+      p.notes=document.getElementById('mp-notes').value;
+      p.clientId=clientId||p.clientId||null;
+      p.dateLundi=nextMonday(date);
+    }
+  } else {
+    d.prestations.push({
+      id:'f'+Date.now(),
+      nom:nom,date:date,type:document.getElementById('mp-type').value,
+      montant:document.getElementById('mp-montant').value,
+      frais:document.getElementById('mp-frais').value,
+      notes:document.getElementById('mp-notes').value,
+      clientId:clientId||null,
+      statut:'brouillon',
+      dateLundi:nextMonday(date)
+    });
+  }
+  save(d);hide('m-prest');toast('Prestation enregistrée');
+  renderAlertes();renderPrestations();
+}
+
+function delPrestation(){
+  if(!editPrestId) return;
+  var d=load();var p=d.prestations.find(function(x){return x.id===editPrestId;});
+  if(!p||!confirm('Supprimer "'+p.nom+'" ?')) return;
+  d.prestations=d.prestations.filter(function(x){return x.id!==editPrestId;});
+  save(d);hide('m-prest');toast('Prestation supprimée');renderAlertes();renderPrestations();
+}
+
+// ─── ÉMETTRE FACTURE ─────────────────────────────────────────
+function emettreFact(){
+  // Sauvegarder d'abord les modifs en cours
+  var nom=document.getElementById('mp-nom').value.trim();
+  var date=document.getElementById('mp-date').value;
+  if(!nom||!date){toast('Complète le nom et la date');return;}
+  var d=load();
+  var p;
+  if(editPrestId){
+    p=d.prestations.find(function(x){return x.id===editPrestId;});
+    if(p){
+      p.nom=nom;p.date=date;p.type=document.getElementById('mp-type').value;
+      p.montant=document.getElementById('mp-montant').value;
+      p.frais=document.getElementById('mp-frais').value;
+      p.notes=document.getElementById('mp-notes').value;
+      p.clientId=selClientId||p.clientId||null;
+    }
+  }
+  if(!p) return;
+  // Vérif profil
+  var prof=d.profil;
+  if(!prof.nom||!prof.siret){toast('Complète ton profil avant d\'émettre une facture');hide('m-prest');showTab('profil');return;}
+  p.statut='emise';
+  p.dateEmission=today();
+  p.numero=p.numero||genNumero();
+  save(d);hide('m-prest');toast('Facture émise !');
+  renderAlertes();renderPrestations();
+  voirFacture(p.id);
+}
+
+function marquerPaye(){
+  var d=load();
+  var p=d.prestations.find(function(x){return x.id===editPrestId;});
+  if(!p) return;
+  // Sauvegarder modifs en cours
+  p.nom=document.getElementById('mp-nom').value.trim()||p.nom;
+  p.montant=document.getElementById('mp-montant').value||p.montant;
+  p.frais=document.getElementById('mp-frais').value||p.frais;
+  p.statut='payee';p.datePaiement=today();
+  save(d);hide('m-prest');toast('Prestation marquée payée ✓');renderAlertes();renderPrestations();
+}
+
+// ─── VUE FACTURE ─────────────────────────────────────────────
+function voirFacture(id){
+  var d=load();
+  var p=d.prestations.find(function(x){return x.id===id;});
+  if(!p) return;
+  var prof=d.profil;
+  var client=p.clientId?d.clients.find(function(c){return c.id===p.clientId;}):null;
+  var montant=parseFloat(p.montant||0);
+  var frais=parseFloat(p.frais||0);
+  var total=montant+frais;
+
+  var html='<h1>FACTURE</h1>'+
+    '<div class="f-meta">N° '+esc(p.numero||'—')+' · Émise le '+fmtDate(p.dateEmission||today())+'</div>'+
+    '<div class="f-parties">'+
+    '<div class="f-partie"><h4>Émetteur</h4><p>'+
+    esc(prof.nom||'')+'<br>'+
+    (prof.activite?esc(prof.activite)+'<br>':'')+
+    (prof.adresse?esc(prof.adresse)+'<br>':'')+
+    'SIRET : '+esc(prof.siret||'')+'</p></div>'+
+    '<div class="f-partie"><h4>Client</h4><p>'+
+    (client?esc(client.nom)+'<br>'+(client.adresse?esc(client.adresse)+'<br>':'')+( client.siret?'SIRET : '+esc(client.siret):''):'Non renseigné')+
+    '</p></div>'+
+    '</div>'+
+    '<table class="f-table">'+
+    '<thead><tr><th>Désignation</th><th>Montant</th></tr></thead>'+
+    '<tbody>'+
+    '<tr><td>'+esc(typeLabel(p.type))+' — '+esc(p.nom)+'<br><small style="color:#888">'+fmtDate(p.date)+'</small></td><td>'+fmtMontant(montant)+'</td></tr>'+
+    (frais>0?'<tr><td>Frais de transport</td><td>'+fmtMontant(frais)+'</td></tr>':'')+
+    '<tr class="f-total"><td>Total</td><td>'+fmtMontant(total)+'</td></tr>'+
+    '</tbody></table>'+
+    '<div class="f-mentions">'+
+    'TVA non applicable — article 293B du CGI<br>'+
+    'Règlement sous 30 jours à réception de la facture.<br>'+
+    (prof.iban?'IBAN : '+esc(prof.iban)+'<br>':'')+
+    (prof.email?'Contact : '+esc(prof.email):'')+'</div>';
+
+  document.getElementById('print-content').innerHTML=html;
+  document.getElementById('main').style.display='none';
+  document.querySelector('header').style.display='none';
+  document.getElementById('print-view').style.display='block';
+}
+
+function closePrint(){
+  document.getElementById('print-view').style.display='none';
+  document.getElementById('main').style.display='block';
+  document.querySelector('header').style.display='flex';
+}
+
+// ─── RELANCE ─────────────────────────────────────────────────
+function showRelance(id){
+  var d=load();
+  var p=d.prestations.find(function(x){return x.id===id;});
+  if(!p) return;
+  var prof=d.profil;
+  var client=p.clientId?d.clients.find(function(c){return c.id===p.clientId;}):null;
+  var total=fmtMontant(parseFloat(p.montant||0)+parseFloat(p.frais||0));
+  var jours=p.dateEmission?daysDiff(p.dateEmission):30;
+
+  var to=client&&client.email?client.email:'[email client]';
+  var objet='Relance — Facture N°'+( p.numero||'—')+' — '+(p.nom||'');
+  var corps='Bonjour,\n\nJe me permets de vous contacter concernant la facture N°'+(p.numero||'—')+' d\'un montant de '+total+', émise le '+fmtDate(p.dateEmission||'')+' pour la prestation du '+fmtDate(p.date||'')+' ('+typeLabel(p.type)+' — '+p.nom+').\n\nÀ ce jour, soit '+jours+' jours après émission, cette facture n\'apparaît pas encore comme réglée dans mon suivi. Pourriez-vous m\'indiquer si vous avez pu traiter ce règlement ?\n\nJe reste disponible pour toute question.\n\nCordialement,\n'+(prof.nom||'[Votre nom]')+(prof.email?'\n'+prof.email:'');
+
+  document.getElementById('mail-to').textContent=to;
+  document.getElementById('mail-objet').textContent=objet;
+  document.getElementById('mail-corps').textContent=corps;
+  document.getElementById('mail-view').style.display='flex';
+  hide('m-prest');
+}
+
+function closeMail(){document.getElementById('mail-view').style.display='none';}
+
+function copyMail(){
+  var to=document.getElementById('mail-to').textContent;
+  var objet=document.getElementById('mail-objet').textContent;
+  var corps=document.getElementById('mail-corps').textContent;
+  var full='À : '+to+'\nObjet : '+objet+'\n\n'+corps;
+  navigator.clipboard.writeText(full).then(function(){toast('Mail copié !');}).catch(function(){
+    // Fallback
+    var ta=document.createElement('textarea');ta.value=full;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Mail copié !');
+  });
+}
+
+// ─── BILAN ───────────────────────────────────────────────────
+var bilanMode='mois'; // 'mois' | 'annee'
+var bilanDate=new Date();
+
+function renderBilan(){
+  var d=load();
+  var year=bilanDate.getFullYear();
+  var month=bilanDate.getMonth(); // 0-11
+
+  var moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+  // Navigation
+  var html='<div class="bilan-nav">'+
+    '<button onclick="bilanPrev()">←</button>'+
+    '<span class="periode">'+(bilanMode==='mois'?moisNoms[month]+' '+year:year)+'</span>'+
+    '<button onclick="bilanNext()">→</button>'+
+    '<button class="'+(bilanMode==='mois'?'on':'')+'" onclick="bilanMode=\'mois\';renderBilan()">Mois</button>'+
+    '<button class="'+(bilanMode==='annee'?'on':'')+'" onclick="bilanMode=\'annee\';renderBilan()">Année</button>'+
+    '</div>';
+
+  if(bilanMode==='annee'){
+    html+=renderBilanAnnuel(d,year);
+  } else {
+    html+=renderBilanMois(d,year,month);
+  }
+
+  document.getElementById('tab-content').innerHTML=html;
+}
+
+function bilanPrev(){
+  if(bilanMode==='mois'){bilanDate.setMonth(bilanDate.getMonth()-1);}
+  else{bilanDate.setFullYear(bilanDate.getFullYear()-1);}
+  renderBilan();
+}
+function bilanNext(){
+  if(bilanMode==='mois'){bilanDate.setMonth(bilanDate.getMonth()+1);}
+  else{bilanDate.setFullYear(bilanDate.getFullYear()+1);}
+  renderBilan();
+}
+
+function getBilanKey(year,month){return 'frais-'+year+'-'+month;}
+
+function renderBilanMois(d,year,month){
+  // Prestations du mois
+  var prest=d.prestations.filter(function(p){
+    var dt=new Date(p.date);
+    return dt.getFullYear()===year&&dt.getMonth()===month;
+  }).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+
+  var html='<div class="bilan-section">Prestations du mois</div>';
+
+  if(!prest.length){
+    html+='<div style="color:#6b7089;font-size:13px;margin-bottom:20px;">Aucune prestation ce mois-ci.</div>';
+  } else {
+    html+='<div class="bilan-table-wrap"><table class="bilan-table">'+
+      '<thead><tr>'+
+      '<th>Date</th><th>Prestation</th><th>Client</th><th>SIRET client</th><th>Adresse</th><th>N° facture</th><th class="num">Cachet</th><th class="num">Transport</th><th class="num">Total</th><th>Statut</th>'+
+      '</tr></thead><tbody>';
+
+    var totalCachet=0,totalTransport=0,totalEncaisse=0;
+    prest.forEach(function(p){
+      var client=p.clientId?d.clients.find(function(c){return c.id===p.clientId;}):null;
+      var cachet=parseFloat(p.montant||0);
+      var transport=parseFloat(p.frais||0);
+      var total=cachet+transport;
+      totalCachet+=cachet;totalTransport+=transport;
+      if(p.statut==='payee') totalEncaisse+=total;
+      var statutCl=p.statut==='payee'?'payee':(p.statut==='emise'?'emise':'brouillon');
+      if(p.statut==='emise'&&p.dateEmission){var j=Math.floor((new Date()-new Date(p.dateEmission))/86400000);if(j>=30)statutCl='relance';}
+      html+='<tr>'+
+        '<td style="white-space:nowrap;">'+fmtDate(p.date)+'</td>'+
+        '<td>'+esc(p.nom)+'</td>'+
+        '<td>'+(client?esc(client.nom):'<span style="color:#6b7089">—</span>')+'</td>'+
+        '<td style="font-size:11px;color:#6b7089;">'+(client&&client.siret?esc(client.siret):'—')+'</td>'+
+        '<td style="font-size:11px;color:#6b7089;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(client&&client.adresse?esc(client.adresse.split('\n')[0]):'—')+'</td>'+
+        '<td style="font-size:11px;">'+(p.numero?esc(p.numero):'<span style="color:#6b7089">—</span>')+'</td>'+
+        '<td class="num">'+(cachet>0?fmtMontant(cachet):'—')+'</td>'+
+        '<td class="num">'+(transport>0?fmtMontant(transport):'—')+'</td>'+
+        '<td class="num" style="font-weight:600;">'+(total>0?fmtMontant(total):'—')+'</td>'+
+        '<td><span class="prestation-statut '+statutCl+'">'+statutLabel(statutCl)+'</span></td>'+
+        '</tr>';
+    });
+
+    // Ligne totaux prestations
+    html+='<tr class="total-row">'+
+      '<td colspan="6" style="color:#9ca3af;">Total prestations</td>'+
+      '<td class="num">'+fmtMontant(totalCachet)+'</td>'+
+      '<td class="num">'+fmtMontant(totalTransport)+'</td>'+
+      '<td class="num">'+fmtMontant(totalCachet+totalTransport)+'</td>'+
+      '<td style="font-size:11px;color:#4ade80;">'+fmtMontant(totalEncaisse)+' encaissé</td>'+
+      '</tr>';
+
+    html+='</tbody></table></div>';
+  }
+
+  // Frais généraux
+  var fraisKey=getBilanKey(year,month);
+  var fraisList=[];
+  try{fraisList=JSON.parse(localStorage.getItem(fraisKey)||'[]');}catch(e){}
+
+  html+='<div class="bilan-section">Frais généraux du mois</div>';
+  html+='<div id="frais-list">';
+  fraisList.forEach(function(f,i){
+    html+='<div class="frais-ligne">'+
+      '<input class="fi-nom" type="text" placeholder="Navigo, Adobe, Matériel..." value="'+esc(f.nom)+'" onchange="updateFrais('+i+',\'nom\',this.value)">'+
+      '<input class="fi-mt" type="number" placeholder="0" value="'+esc(f.montant)+'" min="0" step="0.01" onchange="updateFrais('+i+',\'montant\',this.value)">'+
+      '<button class="fi-del" onclick="deleteFrais('+i+')" title="Supprimer">×</button>'+
+      '</div>';
+  });
+  html+='</div>'+
+    '<button class="add-frais-btn" onclick="addFrais()">+ Ajouter un frais</button>';
+
+  // Résultat net
+  var totalFrais=fraisList.reduce(function(s,f){return s+parseFloat(f.montant||0);},0);
+  var totalPrest=prest.reduce(function(s,p){return s+parseFloat(p.montant||0)+parseFloat(p.frais||0);},0);
+  var net=totalEncaisse-totalFrais;
+
+  html+='<div style="margin-top:24px;overflow-x:auto;"><table class="bilan-table" style="max-width:420px;">'+
+    '<tr class="total-row">'+
+    '<td>Total encaissé</td>'+
+    '<td class="num" style="color:#4ade80;">'+fmtMontant(totalEncaisse)+'</td>'+
+    '</tr>'+
+    '<tr>'+
+    '<td style="color:#9ca3af;">Total frais généraux</td>'+
+    '<td class="num" style="color:#f87171;">− '+fmtMontant(totalFrais)+'</td>'+
+    '</tr>'+
+    '<tr class="net-row">'+
+    '<td>Net du mois</td>'+
+    '<td class="num" style="color:'+(net>=0?'#4ade80':'#f87171')+';">'+fmtMontant(net)+'</td>'+
+    '</tr>'+
+    '</table></div>';
+
+  // Note sur les prestations non encore payées
+  var enAttente=totalPrest-totalEncaisse;
+  if(enAttente>0){
+    html+='<div style="margin-top:10px;font-size:11px;color:#6b7089;">'+fmtMontant(enAttente)+' en attente de paiement ce mois-ci</div>';
+  }
+
+  return html;
+}
+
+function renderBilanAnnuel(d,year){
+  var moisNoms=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  var html='<div class="bilan-annuel"><table>'+
+    '<thead><tr><th>Mois</th><th>Prestations</th><th>Encaissé</th><th>Frais</th><th>Net</th></tr></thead><tbody>';
+
+  var totalAnnuel={prest:0,encaisse:0,frais:0};
+
+  for(var m=0;m<12;m++){
+    var prest=d.prestations.filter(function(p){
+      var dt=new Date(p.date);return dt.getFullYear()===year&&dt.getMonth()===m;
+    });
+    var totalPrest=prest.reduce(function(s,p){return s+parseFloat(p.montant||0)+parseFloat(p.frais||0);},0);
+    var encaisse=prest.filter(function(p){return p.statut==='payee';}).reduce(function(s,p){return s+parseFloat(p.montant||0)+parseFloat(p.frais||0);},0);
+    var fraisList=[];
+    try{fraisList=JSON.parse(localStorage.getItem(getBilanKey(year,m))||'[]');}catch(e){}
+    var frais=fraisList.reduce(function(s,f){return s+parseFloat(f.montant||0);},0);
+    var net=encaisse-frais;
+    totalAnnuel.prest+=totalPrest;totalAnnuel.encaisse+=encaisse;totalAnnuel.frais+=frais;
+
+    html+='<tr style="cursor:pointer" onclick="bilanMode=\'mois\';bilanDate=new Date('+year+','+ m+',1);renderBilan()">'+
+      '<td>'+moisNoms[m]+'</td>'+
+      '<td>'+(totalPrest>0?fmtMontant(totalPrest):'—')+'</td>'+
+      '<td style="color:#4ade80;">'+(encaisse>0?fmtMontant(encaisse):'—')+'</td>'+
+      '<td style="color:#f87171;">'+(frais>0?'− '+fmtMontant(frais):'—')+'</td>'+
+      '<td class="'+(net>0?'net-pos':net<0?'net-neg':'')+'">'+(encaisse>0||frais>0?fmtMontant(net):'—')+'</td>'+
+      '</tr>';
+  }
+
+  var netAnnuel=totalAnnuel.encaisse-totalAnnuel.frais;
+  html+='<tr style="font-weight:700;border-top:2px solid rgba(255,255,255,0.15);">'+
+    '<td>Total '+year+'</td>'+
+    '<td>'+fmtMontant(totalAnnuel.prest)+'</td>'+
+    '<td style="color:#4ade80;">'+fmtMontant(totalAnnuel.encaisse)+'</td>'+
+    '<td style="color:#f87171;">− '+fmtMontant(totalAnnuel.frais)+'</td>'+
+    '<td class="'+(netAnnuel>=0?'net-pos':'net-neg')+'">'+fmtMontant(netAnnuel)+'</td>'+
+    '</tr>';
+
+  html+='</tbody></table></div>';
+  html+='<div style="font-size:11px;color:#6b7089;margin-top:10px;">Clique sur un mois pour voir le détail.</div>';
+  return html;
+}
+
+// Frais CRUD
+function addFrais(){
+  var year=bilanDate.getFullYear(),month=bilanDate.getMonth();
+  var key=getBilanKey(year,month);
+  var list=[];try{list=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  list.push({nom:'',montant:''});
+  localStorage.setItem(key,JSON.stringify(list));
+  renderBilan();
+  // Focus sur le dernier input nom
+  setTimeout(function(){var inputs=document.querySelectorAll('.fi-nom');if(inputs.length)inputs[inputs.length-1].focus();},50);
+}
+
+function updateFrais(idx,field,val){
+  var year=bilanDate.getFullYear(),month=bilanDate.getMonth();
+  var key=getBilanKey(year,month);
+  var list=[];try{list=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  if(list[idx]){list[idx][field]=val;localStorage.setItem(key,JSON.stringify(list));}
+}
+
+function deleteFrais(idx){
+  var year=bilanDate.getFullYear(),month=bilanDate.getMonth();
+  var key=getBilanKey(year,month);
+  var list=[];try{list=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  list.splice(idx,1);localStorage.setItem(key,JSON.stringify(list));
+  renderBilan();
+}
+
+// ─── CLIENTS ─────────────────────────────────────────────────
+var editClientId=null;
+function renderClients(){
+  var d=load();
+  if(!d.clients.length){
+    document.getElementById('tab-content').innerHTML=
+      '<div class="empty"><div class="empty-ico">🏠</div>Aucun client encore.<br>Ils s\'ajoutent automatiquement quand tu crées une prestation.</div>'+
+      '<div style="text-align:center;margin-top:16px;"><button class="hdr-btn" onclick="openNewClient()">+ Ajouter un client</button></div>';
+    return;
+  }
+  var html='<div style="text-align:right;margin-bottom:12px;"><button class="hdr-btn" onclick="openNewClient()">+ Ajouter un client</button></div>';
+  d.clients.forEach(function(c){
+    html+='<div class="prestation" onclick="openEditClient(\''+c.id+'\')">'+
+      '<div class="prestation-top"><span class="prestation-nom">'+esc(c.nom)+'</span></div>'+
+      '<div class="prestation-bot">'+
+      (c.email?'<span>✉️ '+esc(c.email)+'</span>':'')+
+      (c.siret?'<span>SIRET '+esc(c.siret)+'</span>':'')+
+      (c.tel?'<span>📱 '+esc(c.tel)+'</span>':'')+
+      '</div>'+
+      '</div>';
+  });
+  document.getElementById('tab-content').innerHTML=html;
+}
+
+function openNewClient(){
+  editClientId=null;
+  document.getElementById('mc-titre').textContent='Nouveau client';
+  ['mc-nom','mc-siret','mc-adresse','mc-email','mc-tel'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('mc-del').style.display='none';
+  show('m-client');setTimeout(function(){document.getElementById('mc-nom').focus();},80);
+}
+
+function openEditClient(id){
+  var d=load();var c=d.clients.find(function(x){return x.id===id;});if(!c) return;
+  editClientId=id;
+  document.getElementById('mc-titre').textContent='Modifier le client';
+  document.getElementById('mc-nom').value=c.nom||'';
+  document.getElementById('mc-siret').value=c.siret||'';
+  document.getElementById('mc-adresse').value=c.adresse||'';
+  document.getElementById('mc-email').value=c.email||'';
+  document.getElementById('mc-tel').value=c.tel||'';
+  document.getElementById('mc-del').style.display='';
+  show('m-client');
+}
+
+function saveClient(){
+  var nom=document.getElementById('mc-nom').value.trim();
+  if(!nom){toast('Nom obligatoire');return;}
+  var d=load();
+  var obj={nom:nom,siret:document.getElementById('mc-siret').value.trim(),adresse:document.getElementById('mc-adresse').value.trim(),email:document.getElementById('mc-email').value.trim(),tel:document.getElementById('mc-tel').value.trim()};
+  if(editClientId){var c=d.clients.find(function(x){return x.id===editClientId;});if(c)Object.assign(c,obj);}
+  else{obj.id='c'+Date.now();d.clients.push(obj);}
+  save(d);hide('m-client');toast('Client enregistré');if(curTab==='clients')renderClients();
+}
+
+function delClient(){
+  if(!editClientId) return;
+  var d=load();var c=d.clients.find(function(x){return x.id===editClientId;});
+  if(!c||!confirm('Supprimer "'+c.nom+'" ?')) return;
+  d.clients=d.clients.filter(function(x){return x.id!==editClientId;});
+  save(d);hide('m-client');toast('Client supprimé');renderClients();
+}
+
+// ─── PROFIL ──────────────────────────────────────────────────
+function renderProfil(){
+  var d=load();var p=d.profil;
+  var html='<div style="max-width:480px;">'+
+    '<div class="section-titre">Mes informations (apparaissent sur les factures)</div>'+
+    '<div class="fg"><label>Nom complet / Raison sociale *</label><input type="text" id="pr-nom" value="'+esc(p.nom||'')+'" placeholder="Prénom Nom"></div>'+
+    '<div class="fg"><label>Activité</label><input type="text" id="pr-activite" value="'+esc(p.activite||'')+'" placeholder="DJ, Cours de DJ..."></div>'+
+    '<div class="fg"><label>SIRET *</label><input type="text" id="pr-siret" value="'+esc(p.siret||'')+'" placeholder="12345678901234"></div>'+
+    '<div class="fg"><label>Adresse</label><textarea id="pr-adresse" rows="2" placeholder="12 rue de la Musique&#10;75001 Paris">'+esc(p.adresse||'')+'</textarea></div>'+
+    '<div class="fg"><label>Email</label><input type="email" id="pr-email" value="'+esc(p.email||'')+'" placeholder="toi@email.fr"></div>'+
+    '<div class="fg"><label>IBAN (optionnel, apparaît sur la facture)</label><input type="text" id="pr-iban" value="'+esc(p.iban||'')+'" placeholder="FR76..."></div>'+
+    '<button class="bok" style="max-width:200px;margin-top:4px;" onclick="saveProfil()">Enregistrer</button>'+
+    '<div style="margin-top:24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;">'+
+    '<div class="section-titre" style="margin-top:0;">Mention légale automatique</div>'+
+    '<div style="font-size:12px;color:#6b7089;line-height:1.7;">TVA non applicable — article 293B du CGI<br>Délai de règlement : 30 jours à réception</div>'+
+    '</div>'+
+    '</div>';
+  document.getElementById('tab-content').innerHTML=html;
+}
+
+function saveProfil(){
+  var d=load();
+  d.profil={
+    nom:document.getElementById('pr-nom').value.trim(),
+    activite:document.getElementById('pr-activite').value.trim(),
+    siret:document.getElementById('pr-siret').value.trim(),
+    adresse:document.getElementById('pr-adresse').value.trim(),
+    email:document.getElementById('pr-email').value.trim(),
+    iban:document.getElementById('pr-iban').value.trim()
+  };
+  save(d);toast('Profil enregistré ✓');
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+window.addEventListener('message',function(e){
+  if(e.data&&e.data.type==='reload-factures'){renderAlertes();showTab(curTab);}
+});
+
+// Détecter les changements localStorage depuis index.html (même domaine déployé)
+window.addEventListener('storage',function(e){
+  if(e.key==='facturesData'){renderAlertes();if(curTab==='prestations')renderPrestations();else if(curTab==='bilan')renderBilan();}
+});
+
+// Polling léger — vérifie toutes les 2s si de nouvelles prestations ont été ajoutées depuis l'index
+var _lastFacturesHash='';
+function pollFactures(){
+  var raw=localStorage.getItem('facturesData')||'';
+  if(raw!==_lastFacturesHash){
+    _lastFacturesHash=raw;
+    renderAlertes();
+    if(curTab==='prestations')renderPrestations();
+    else if(curTab==='bilan')renderBilan();
+  }
+}
+setInterval(pollFactures,2000);
+
+window.addEventListener('load',function(){
+  renderAlertes();
+  renderPrestations();
+  // Vérifier si profil vide → suggérer de le compléter
+  var d=load();
+  if(!d.profil.nom&&!d.prestations.length){
+    setTimeout(function(){toast('👋 Commence par compléter ton profil !');},800);
+  }
+});
+</script>
+</body>
+</html>

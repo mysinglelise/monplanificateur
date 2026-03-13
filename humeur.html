@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Humeur & Énergie</title>
+<style>
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --surface2: #f0eff0;
+    --border: rgba(0,0,0,0.08);
+    --text: #1a1a2e;
+    --muted: #888899;
+    --hypo: #5a8fa8;
+    --hyper: #e8621a;
+    --anx: #7c5cbf;
+    --shadow: 0 2px 12px rgba(0,0,0,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); }
+  .header h1 { font-size: 15px; font-weight: 800; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: transparent; color: var(--muted); transition: all .2s; }
+  .tab.active { background: var(--text); color: white; border-color: var(--text); }
+
+  .section { display: none; padding: 16px; max-width: 480px; margin: 0 auto; }
+  .section.active { display: block; }
+
+  .date-row { margin-bottom: 14px; }
+  .date-row input[type=date] { background: var(--surface); border: 1.5px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 10px; font-size: 13px; width: 100%; box-shadow: var(--shadow); }
+
+  .card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: 12px; }
+
+  .etat-btns { display: flex; gap: 10px; }
+  .etat-btn { flex: 1; padding: 14px 8px; border-radius: 12px; border: 2px solid var(--border); cursor: pointer; text-align: center; background: var(--surface2); transition: all .2s; }
+  .etat-btn .ico { font-size: 28px; display: block; }
+  .etat-btn .lbl { font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 4px; display: block; }
+  .etat-btn.sel-hypo { border-color: var(--hypo); background: rgba(90,143,168,0.08); }
+  .etat-btn.sel-hypo .lbl { color: var(--hypo); }
+  .etat-btn.sel-hyper { border-color: var(--hyper); background: rgba(232,98,26,0.08); }
+  .etat-btn.sel-hyper .lbl { color: var(--hyper); }
+
+  .emoji-scale { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .emoji-scale-btn { font-size: 24px; padding: 4px 2px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; background: none; transition: all .15s; line-height: 1; opacity: 0.25; }
+  .emoji-scale-btn.active { opacity: 1; transform: scale(1.15); }
+  .emoji-scale-btn:hover { opacity: 0.7; transform: scale(1.1); }
+
+  .scale-label { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+
+  textarea { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-size: 13px; resize: vertical; min-height: 80px; font-family: inherit; }
+  textarea::placeholder { color: var(--muted); }
+  textarea:focus { outline: none; border-color: rgba(0,0,0,0.2); }
+
+  .btn-save { width: 100%; padding: 13px; border-radius: 12px; border: none; background: var(--text); color: white; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s; margin-top: 4px; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-save:active { transform: scale(.98); }
+  .save-ok { color: #22c55e; font-size: 13px; font-weight: 700; text-align: center; margin-top: 8px; display: none; }
+
+  .entry { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; box-shadow: var(--shadow); }
+  .entry-bar { width: 4px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 30px; }
+  .entry-bar.hypo { background: var(--hypo); }
+  .entry-bar.hyper { background: var(--hyper); }
+  .entry-bar.anx { background: var(--anx); }
+  .entry-bar.none { background: var(--border); }
+  .entry-date { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .entry-etat { font-size: 14px; font-weight: 800; margin-top: 1px; }
+  .entry-details { font-size: 13px; margin-top: 4px; }
+  .entry-notes { font-size: 12px; color: #666; margin-top: 4px; font-style: italic; }
+  .entry-delete { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0 4px; opacity: 0.3; flex-shrink: 0; }
+  .entry-delete:hover { opacity: 0.8; }
+
+  .moment-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .moment-tag { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); transition: all .15s; }
+  .moment-tag.active { border-color: var(--anx); background: rgba(124,92,191,0.08); color: var(--anx); }
+
+  .heatmap-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .heatmap-year { font-size: 18px; font-weight: 800; }
+  .heatmap-nav { background: var(--surface); border: 1.5px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  .heatmap-grid { display: grid; grid-template-columns: repeat(53, 1fr); gap: 2px; }
+  .heatmap-cell { aspect-ratio: 1; border-radius: 2px; background: var(--surface2); }
+  .heatmap-cell.hypo { background: var(--hypo); opacity: 0.7; }
+  .heatmap-cell.hyper { background: var(--hyper); opacity: 0.8; }
+  .heatmap-cell.anx-only { background: var(--anx); opacity: 0.5; }
+  .heatmap-cell.today { outline: 2px solid var(--text); outline-offset: 1px; }
+  .heatmap-months { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .heatmap-month { font-size: 9px; color: var(--muted); font-weight: 600; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .stat-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; box-shadow: var(--shadow); }
+  .stat-num { font-size: 28px; font-weight: 900; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 600; }
+  .stat-card.hypo .stat-num { color: var(--hypo); }
+  .stat-card.hyper .stat-num { color: var(--hyper); }
+  .stat-card.anx .stat-num { color: var(--anx); }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌡️ Humeur & Énergie</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('saisie')">Saisie</button>
+    <button class="tab" onclick="showTab('historique')">Journal</button>
+    <button class="tab" onclick="showTab('annee')">Année</button>
+  </div>
+</div>
+
+<!-- SAISIE -->
+<div id="tab-saisie" class="section active">
+  <div class="date-row">
+    <input type="date" id="saisie-date" />
+  </div>
+
+  <div class="card">
+    <div class="card-title">Comment tu te sens ?</div>
+    <div class="etat-btns">
+      <button class="etat-btn" id="btn-hypo" onclick="selectEtat('hypo')">
+        <span class="ico">🛌</span><span class="lbl">Hypo-actif</span>
+      </button>
+      <button class="etat-btn" id="btn-hyper" onclick="selectEtat('hyper')">
+        <span class="ico">🤯</span><span class="lbl">Hyper-actif</span>
+      </button>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="scale-label">Énergie</div>
+      <div class="emoji-scale" id="scale-energie">
+        <button class="emoji-scale-btn" data-val="1" onclick="selectScale('energie',1)">⚡</button>
+        <button class="emoji-scale-btn" data-val="2" onclick="selectScale('energie',2)">⚡</button>
+        <button class="emoji-scale-btn" data-val="3" onclick="selectScale('energie',3)">⚡</button>
+        <button class="emoji-scale-btn" data-val="4" onclick="selectScale('energie',4)">⚡</button>
+        <button class="emoji-scale-btn" data-val="5" onclick="selectScale('energie',5)">⚡</button>
+      </div>
+    </div>
+    <!-- Heures de sommeil (visible si hyper) -->
+    <div id="sommeil-row" style="display:none; margin-top:14px;">
+      <div class="scale-label">Heures de sommeil cette nuit</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="number" id="sommeil-h" min="0" max="24" step="0.5" placeholder="—"
+          style="width:70px; padding:8px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); font-size:16px; font-weight:700; text-align:center;" />
+        <span style="font-size:13px; color:var(--muted);">heures</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Larmes</div>
+    <div class="emoji-scale" id="scale-larmes">
+      <button class="emoji-scale-btn" data-val="1" onclick="selectScale('larmes',1)">💧</button>
+      <button class="emoji-scale-btn" data-val="2" onclick="selectScale('larmes',2)">💧</button>
+      <button class="emoji-scale-btn" data-val="3" onclick="selectScale('larmes',3)">💧</button>
+      <button class="emoji-scale-btn" data-val="4" onclick="selectScale('larmes',4)">💧</button>
+      <button class="emoji-scale-btn" data-val="5" onclick="selectScale('larmes',5)">💧</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Angoisse</div>
+    <div class="emoji-scale" id="scale-anx">
+      <button class="emoji-scale-btn" data-val="1" onclick="selectScale('anx',1)">👿</button>
+      <button class="emoji-scale-btn" data-val="2" onclick="selectScale('anx',2)">👿</button>
+      <button class="emoji-scale-btn" data-val="3" onclick="selectScale('anx',3)">👿</button>
+      <button class="emoji-scale-btn" data-val="4" onclick="selectScale('anx',4)">👿</button>
+    </div>
+    <div id="anx-moment" style="display:none; margin-top:12px;">
+      <div class="scale-label">Moment</div>
+      <div class="moment-tags">
+        <button class="moment-tag" id="anx-matin" onclick="toggleMoment('matin')">Matin</button>
+        <button class="moment-tag" id="anx-aprem" onclick="toggleMoment('aprem')">Après-midi</button>
+        <button class="moment-tag" id="anx-soir" onclick="toggleMoment('soir')">Soir</button>
+        <button class="moment-tag" id="anx-nuit" onclick="toggleMoment('nuit')">Nuit</button>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="scale-label">Notes sur l'angoisse</div>
+        <textarea id="anx-notes" placeholder="Gorge serrée, larmes, contexte..." style="min-height:60px;"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Notes</div>
+    <textarea id="notes-texte" placeholder="Ce qui se passe, comment tu te sens, ce qui a déclenché..."></textarea>
+  </div>
+
+  <button class="btn-save" onclick="sauvegarder()">Enregistrer</button>
+  <div class="save-ok" id="save-ok">✓ Enregistré !</div>
+</div>
+
+<!-- JOURNAL -->
+<div id="tab-historique" class="section">
+  <div id="historique-list"></div>
+</div>
+
+<!-- ANNÉE -->
+<div id="tab-annee" class="section">
+  <div class="heatmap-header">
+    <button class="heatmap-nav" onclick="changeYear(-1)">←</button>
+    <span class="heatmap-year" id="heatmap-year-label"></span>
+    <button class="heatmap-nav" onclick="changeYear(1)">→</button>
+  </div>
+  <div class="heatmap-months" id="heatmap-months"></div>
+  <div class="heatmap-grid" id="heatmap-grid"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--hypo)"></div>Hypo 🛌</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--hyper)"></div>Hyper 🤯</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--anx)"></div>Angoisse seule</div>
+  </div>
+  <div class="stats-grid" id="stats-year"></div>
+</div>
+
+<script>
+function loadData() { try { return JSON.parse(localStorage.getItem('humeurData')||'[]'); } catch(e){ return []; } }
+function saveData(d) {
+  localStorage.setItem('humeurData', JSON.stringify(d));
+  try { window.parent&&window.parent._syncNow&&window.parent._syncNow(); } catch(e){}
+}
+
+var state = { etat:null, energie:0, larmes:0, anx:0, moments:[], notes:'' };
+var heatmapYear = new Date().getFullYear();
+
+window.addEventListener('load', function() {
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('saisie-date').value = today;
+  prefillIfExists(today);
+});
+
+document.getElementById('saisie-date').addEventListener('change', function() {
+  resetState(); prefillIfExists(this.value);
+});
+
+function prefillIfExists(ds) {
+  var e = loadData().find(function(x){ return x.date===ds; });
+  if (!e) return;
+  if (e.etat) selectEtat(e.etat);
+  if (e.energie) selectScale('energie', e.energie);
+  if (e.larmes) selectScale('larmes', e.larmes);
+  if (e.anx) selectScale('anx', e.anx);
+  if (e.moments) e.moments.forEach(toggleMoment);
+  if (e.sommeil) document.getElementById('sommeil-h').value = e.sommeil;
+  if (e.anxNotes) document.getElementById('anx-notes').value = e.anxNotes;
+  if (e.notes) document.getElementById('notes-texte').value = e.notes;
+}
+
+function resetState() {
+  state = { etat:null, energie:0, larmes:0, anx:0, moments:[], notes:'', sommeil:null, anxNotes:'' };
+  ['hypo','hyper'].forEach(function(e){ document.getElementById('btn-'+e).className='etat-btn'; });
+  ['energie','larmes','anx'].forEach(function(s){
+    document.querySelectorAll('#scale-'+s+' .emoji-scale-btn').forEach(function(b){ b.className='emoji-scale-btn'; });
+  });
+  ['matin','aprem','soir','nuit'].forEach(function(m){ document.getElementById('anx-'+m).className='moment-tag'; });
+  document.getElementById('anx-moment').style.display='none';
+  document.getElementById('sommeil-row').style.display='none';
+  document.getElementById('sommeil-h').value='';
+  document.getElementById('anx-notes').value='';
+  document.getElementById('notes-texte').value='';
+  document.getElementById('save-ok').style.display='none';
+}
+
+function selectEtat(etat) {
+  state.etat = state.etat===etat ? null : etat;
+  ['hypo','hyper'].forEach(function(e){
+    document.getElementById('btn-'+e).className='etat-btn'+(e===state.etat?' sel-'+e:'');
+  });
+  document.getElementById('sommeil-row').style.display = state.etat==='hyper' ? 'block' : 'none';
+}
+
+function selectScale(scale, val) {
+  state[scale] = state[scale]===val ? 0 : val;
+  document.querySelectorAll('#scale-'+scale+' .emoji-scale-btn').forEach(function(b){
+    b.className='emoji-scale-btn'+(parseInt(b.getAttribute('data-val'))<=state[scale]?' active':'');
+  });
+  if (scale==='anx') document.getElementById('anx-moment').style.display=state.anx>0?'block':'none';
+}
+
+function toggleMoment(m) {
+  var idx=state.moments.indexOf(m);
+  if (idx>=0) state.moments.splice(idx,1); else state.moments.push(m);
+  ['matin','aprem','soir','nuit'].forEach(function(x){
+    document.getElementById('anx-'+x).className='moment-tag'+(state.moments.indexOf(x)>=0?' active':'');
+  });
+}
+
+function sauvegarder() {
+  var ds = document.getElementById('saisie-date').value;
+  var notes = document.getElementById('notes-texte').value.trim();
+  var anxNotes = document.getElementById('anx-notes').value.trim();
+  var sommeil = parseFloat(document.getElementById('sommeil-h').value) || null;
+  if (!state.etat && !state.anx && !state.energie && !state.larmes && !notes) {
+    alert('Note au moins quelque chose !'); return;
+  }
+  var entry = { date:ds, etat:state.etat, energie:state.energie, larmes:state.larmes, anx:state.anx, moments:state.moments.slice(), sommeil:sommeil, anxNotes:anxNotes, notes:notes, ts:Date.now() };
+  var data = loadData();
+  var idx = data.findIndex(function(e){ return e.date===ds; });
+  if (idx>=0) data[idx]=entry; else data.push(entry);
+  data.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  saveData(data);
+  try { window.parent&&window.parent.postMessage({type:'humeurUpdate'},'*'); } catch(e){}
+  var ok=document.getElementById('save-ok');
+  ok.style.display='block';
+  setTimeout(function(){ ok.style.display='none'; }, 2000);
+}
+
+function showTab(tab) {
+  ['saisie','historique','annee'].forEach(function(t){
+    document.getElementById('tab-'+t).className='section'+(t===tab?' active':'');
+  });
+  document.querySelectorAll('.tab').forEach(function(b,i){
+    b.className='tab'+(['saisie','historique','annee'][i]===tab?' active':'');
+  });
+  if (tab==='historique') renderHistorique();
+  if (tab==='annee') renderHeatmap();
+}
+
+function renderHistorique() {
+  var data=loadData(), el=document.getElementById('historique-list');
+  if (!data.length) { el.innerHTML='<div class="empty">Aucune entrée pour l\'instant.</div>'; return; }
+  el.innerHTML = data.map(function(e){
+    var bar=e.etat||(e.anx>0?'anx':'none');
+    var etatLabel=e.etat==='hypo'?'🛌 Hypo-actif':e.etat==='hyper'?'🤯 Hyper-actif':'';
+    var parts=[];
+    if (e.energie) parts.push('⚡'.repeat(e.energie));
+    if (e.larmes) parts.push('💧'.repeat(e.larmes));
+    if (e.sommeil) parts.push('🌙 '+e.sommeil+'h');
+    if (e.anx) parts.push('👿'.repeat(e.anx)+(e.moments&&e.moments.length?' · '+e.moments.join(', '):''));
+    var anxNotesStr = e.anxNotes ? '<div class="entry-notes" style="color:var(--anx);">↳ '+esc(e.anxNotes)+'</div>' : '';
+    return '<div class="entry">'
+      +'<div class="entry-bar '+bar+'"></div>'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div class="entry-date">'+formatDate(e.date)+'</div>'
+        +(etatLabel?'<div class="entry-etat">'+etatLabel+'</div>':'')
+        +(parts.length?'<div class="entry-details">'+parts.join('  ')+'</div>':'')
+        +anxNotesStr
+        +(e.notes?'<div class="entry-notes">"'+esc(e.notes)+'"</div>':'')
+      +'</div>'
+      +'<button class="entry-delete" onclick="deleteEntry(\''+e.date+'\')">×</button>'
+    +'</div>';
+  }).join('');
+}
+
+function deleteEntry(ds) {
+  if (!confirm('Supprimer ?')) return;
+  saveData(loadData().filter(function(e){ return e.date!==ds; }));
+  renderHistorique();
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatDate(d){ return new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'long'}); }
+
+function changeYear(delta){ heatmapYear+=delta; renderHeatmap(); }
+
+function dateToStr(d) {
+  var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
+
+function renderHeatmap() {
+  document.getElementById('heatmap-year-label').textContent=heatmapYear;
+  var data=loadData(), byDate={};
+  data.forEach(function(e){ byDate[e.date]=e; });
+  var today=dateToStr(new Date());
+  var start=new Date(heatmapYear,0,1);
+  var dow=start.getDay();
+  start.setDate(start.getDate()+(dow===0?-6:1-dow));
+  var MONTHS=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  var mPos={}, html='';
+  // Générer ligne par ligne (d=jour de semaine en extérieur, w=semaine en intérieur)
+  // pour correspondre à la grille CSS grid-template-columns: repeat(53, 1fr)
+  for (var d=0;d<7;d++) for (var w=0;w<53;w++) {
+    var cur=new Date(start.getFullYear(), start.getMonth(), start.getDate()+w*7+d);
+    var ds=dateToStr(cur);
+    if (cur.getFullYear()!==heatmapYear){ html+='<div class="heatmap-cell" style="opacity:.15;"></div>'; continue; }
+    if (d===0 && cur.getDate()===1) mPos[cur.getMonth()]=w;
+    var e=byDate[ds], cls='heatmap-cell';
+    if (e){ if (e.etat==='hypo') cls+=' hypo'; else if (e.etat==='hyper') cls+=' hyper'; else if (e.anx>0) cls+=' anx-only'; }
+    if (ds===today) cls+=' today';
+    html+='<div class="'+cls+'" title="'+ds+'"></div>';
+  }
+  document.getElementById('heatmap-grid').innerHTML=html;
+  var mArr=Object.keys(mPos).map(function(k){ return {m:parseInt(k),w:mPos[k]}; }).sort(function(a,b){return a.w-b.w;});
+  document.getElementById('heatmap-months').innerHTML=mArr.map(function(x){ return '<span class="heatmap-month">'+MONTHS[x.m]+'</span>'; }).join('');
+  var yd=data.filter(function(e){ return e.date.startsWith(''+heatmapYear); });
+  document.getElementById('stats-year').innerHTML=
+    '<div class="stat-card hypo"><div class="stat-num">'+yd.filter(function(e){return e.etat==='hypo';}).length+'</div><div class="stat-label">jours hypo 🛌</div></div>'+
+    '<div class="stat-card hyper"><div class="stat-num">'+yd.filter(function(e){return e.etat==='hyper';}).length+'</div><div class="stat-label">jours hyper 🤯</div></div>'+
+    '<div class="stat-card anx"><div class="stat-num">'+yd.filter(function(e){return e.anx>0;}).length+'</div><div class="stat-label">avec angoisse</div></div>'+
+    '<div class="stat-card"><div class="stat-num">'+(function(){ var s=yd.filter(function(e){return e.energie;}); return s.length?(s.reduce(function(a,e){return a+e.energie;},0)/s.length).toFixed(1):'—'; })()+'</div><div class="stat-label">énergie moy. /5</div></div>';
+}
+
+window.addEventListener('storage', function(e) {
+  if (e.key!=='humeurData') return;
+  var t=document.querySelector('.tab.active');
+  if (t&&t.textContent.includes('Journal')) renderHistorique();
+  if (t&&t.textContent.includes('Année')) renderHeatmap();
+});
+</script>
+</body>
+</html>
