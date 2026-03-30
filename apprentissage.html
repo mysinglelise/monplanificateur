@@ -1228,12 +1228,12 @@ function openPanel(planet,gdata){
   html+='<div class="psec"><div class="slabel">Eclats</div>';
   if(!eclats.length) html+='<div class="empty">Aucun eclat</div>';
   eclats.forEach(function(e){
-    html+='<div class="ec"><div class="ec-t">'+esc(e.texte)+'</div>'+
-      '<div class="ec-m">'+(e.date?'<span>'+fmtDate(e.date)+'</span>':'')+
-      (e.lien?'<a href="'+e.lien+'" target="_blank">lien</a>':'')+
-      '<div class="ec" onclick="openEclatRead(\''+e.id+'\')" style="cursor:pointer;"><div class="ec-t">'+esc(e.texte)+'</div>'+
-      '<div class="ec-m">'+(e.date?'<span>'+fmtDate(e.date)+'</span>':'')+
-      (e.lien?'<a href="'+e.lien+'" target="_blank">lien</a>':'')+
+    var preview=e.texte?(e.texte.length>80?e.texte.slice(0,80)+'…':e.texte):'';
+    html+='<div class="ec" onclick="openEclatRead(\''+e.id+'\')" style="cursor:pointer;">'+
+      '<div class="ec-t">'+esc(preview)+'</div>'+
+      '<div class="ec-m">'+
+      (e.date?'<span>'+fmtDate(e.date)+'</span>':'')+
+      (e.lien?'<a href="'+e.lien+'" target="_blank" onclick="event.stopPropagation()">lien</a>':'')+
       '</div></div>';
   });
   html+='<button class="add-s" onclick="openEclat(null)" style="--pc:'+(mainG?mainG.couleur:'#a78bfa')+';">+ Nouvel eclat</button></div>';
