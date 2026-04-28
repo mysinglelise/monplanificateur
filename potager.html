@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌱 Potager Syntropique</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2d6a4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  const cfg = { apiKey:"AIzaSyCnv0S78A8kK9vHHrzQKfYbX6NWM1UXRhs", authDomain:"mon-planificateur-1e03c.firebaseapp.com", projectId:"mon-planificateur-1e03c", storageBucket:"mon-planificateur-1e03c.firebasestorage.app", messagingSenderId:"978579425049", appId:"1:978579425049:web:e53559ba2b80517c7c6788" };
+  const app = initializeApp(cfg);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  window._fb = { auth, db, doc, setDoc, getDoc, onSnapshot, signOut };
+  window._signOut = () => signOut(auth).then(() => location.href='index.html');
+  onAuthStateChanged(auth, u => {
+    window._currentUser = u;
+    if (u) { document.getElementById('loading').style.display='none'; document.getElementById('app').style.display='block'; window._initSync(u.uid); }
+    else location.href='index.html';
+  });
+</script>
+
+<style>
+:root {
+  --vert:   #2d6a4f;
+  --vert2:  #40916c;
+  --vert3:  #52b788;
+  --clair:  #d8f3dc;
+  --paille: #fefae0;
+  --terre:  #7c4a03;
+  --sol:    #a68a64;
+  --amber:  #e9c46a;
+  --rouge:  #e63946;
+  --bleu:   #4361ee;
+  --ink:    #1b1b2f;
+  --soft:   #4a4e69;
+  --muted:  #9a8c98;
+  --line:   #e8e8e8;
+  --bg:     #f8fdf9;
+  --card:   #ffffff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;}
+
+/* ── HEADER ── */
+#header{background:linear-gradient(135deg,var(--vert),var(--vert2));color:white;padding:0 16px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 3px 16px rgba(45,106,79,.35);}
+#header h1{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:.01em;}
+.back-btn{background:rgba(255,255,255,.2);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;}
+
+/* ── TABS ── */
+#tabs{display:flex;background:white;border-bottom:2px solid var(--line);position:sticky;top:58px;z-index:90;overflow-x:auto;}
+.tab{flex:1;min-width:70px;padding:11px 6px;border:none;background:none;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap;}
+.tab.active{color:var(--vert);border-bottom-color:var(--vert);}
+
+/* ── SECTIONS ── */
+.section{display:none;padding:14px 16px 90px;}
+.section.active{display:block;}
+
+/* ── CARDS ── */
+.card{background:white;border-radius:14px;border:1.5px solid var(--line);padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.05);}
+.card-titre{font-family:'DM Serif Display',serif;font-size:17px;color:var(--vert);margin-bottom:10px;}
+
+/* ── CALCUL BIOMASSE ── */
+.calc-box{background:linear-gradient(135deg,#d8f3dc,#b7e4c7);border:1.5px solid var(--vert3);border-radius:14px;padding:16px;margin-bottom:12px;}
+.calc-nb{font-family:'DM Serif Display',serif;font-size:38px;color:var(--vert);line-height:1;}
+.calc-label{font-size:12px;color:var(--soft);margin-top:2px;}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.calc-item{background:rgba(255,255,255,.7);border-radius:10px;padding:10px;text-align:center;}
+
+/* ── PLANCHES CARTE ── */
+#planches-haie{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;}
+#planches-haie-label{font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+#planches-interieur-label{font-size:10px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.07em;margin:8px 0 4px;display:flex;align-items:center;gap:6px;}
+#planches-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.planche-cell{min-height:110px;border-radius:10px;border:2px solid var(--line);cursor:pointer;display:flex;flex-direction:column;padding:8px;text-align:left;position:relative;transition:all .2s;gap:3px;}
+.planche-cell.haie{min-height:80px;}
+.planche-cell.biomasse{background:#d8f3dc;border-color:var(--vert3);}
+.planche-cell.comestible{background:#fff3cd;border-color:#ffc107;}
+.planche-cell.protection{background:#cff4fc;border-color:#0ea5e9;}
+.planche-cell.vide{background:#f8f9fa;border-color:#dee2e6;}
+.planche-cell.selected{box-shadow:0 0 0 3px var(--vert);transform:scale(1.02);}
+.planche-cell:hover{transform:scale(1.02);}
+.planche-num{font-size:9px;color:var(--muted);font-weight:700;}
+.planche-ico{font-size:18px;line-height:1;}
+.planche-nom{font-size:10px;font-weight:700;color:var(--ink);line-height:1.2;word-break:break-word;}
+.planche-plantes{font-size:9px;color:var(--soft);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.planche-notes-preview{font-size:9px;color:var(--muted);font-style:italic;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;margin-top:2px;}
+.planche-pert-dot{position:absolute;bottom:6px;right:6px;width:8px;height:8px;border-radius:50%;}
+
+/* ── LÉGENDE ── */
+.legende{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:12px;}
+.leg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+
+/* ── PLANCHE DETAIL ── */
+.planche-detail{background:var(--paille);border:1.5px solid var(--amber);border-radius:12px;padding:14px;margin-bottom:12px;}
+.planche-detail-titre{font-weight:700;font-size:15px;margin-bottom:10px;color:var(--terre);}
+
+/* ── PLANTES ── */
+.plante-tag{display:inline-flex;align-items:center;gap:5px;background:var(--clair);border:1px solid var(--vert3);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--vert);margin:2px;}
+.plante-tag.remove{cursor:pointer;}
+.plante-tag.remove:hover{background:#fee2e2;border-color:#fca5a5;color:var(--rouge);}
+.arbuste-tag{background:#e0f2fe;border-color:#38bdf8;color:#0369a1;}
+.biomasse-tag{background:#fce7f3;border-color:#f472b6;color:#be185d;}
+
+/* ── CALENDRIER PERTURBATIONS ── */
+.mois-block{background:white;border-radius:12px;border:1.5px solid var(--line);margin-bottom:10px;overflow:hidden;}
+.mois-header{background:var(--vert);color:white;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:700;}
+.mois-body{padding:12px;}
+.perturbation-types{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.pert-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--line);background:white;font-size:13px;cursor:pointer;transition:all .15s;font-weight:500;}
+.pert-btn.active{background:var(--vert);border-color:var(--vert);color:white;}
+.effet-input{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:55px;}
+.effet-input:focus{outline:none;border-color:var(--vert);}
+
+/* ── SAUT DU CHAT ── */
+.saut-bar{height:16px;background:#e9ecef;border-radius:8px;overflow:hidden;margin:8px 0;}
+.saut-fill{height:100%;background:linear-gradient(90deg,#2d6a4f,#52b788,#95d5b2);border-radius:8px;transition:width .6s ease;}
+.saut-milestones{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── SOL ── */
+.obs-card{background:white;border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;}
+.obs-titre{font-weight:700;font-size:13px;color:var(--vert);margin-bottom:8px;}
+.obs-slider{width:100%;accent-color:var(--vert);}
+.obs-emojis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;}
+.conseil-box{background:#fffbeb;border:1.5px solid var(--amber);border-radius:10px;padding:10px;font-size:12px;color:var(--terre);margin-top:6px;line-height:1.5;}
+
+/* ── BIBLIOTHÈQUE ── */
+.plante-fiche{background:white;border-radius:12px;border:1.5px solid var(--line);padding:12px;margin-bottom:8px;}
+.plante-fiche-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.plante-ico-big{font-size:32px;}
+.plante-nom{font-weight:700;font-size:15px;}
+.plante-role{font-size:11px;color:var(--muted);margin-top:1px;}
+.plante-info{font-size:12px;color:var(--soft);line-height:1.6;}
+.plante-timing{background:var(--clair);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--vert);font-weight:600;margin-top:6px;}
+.assoc-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+.assoc-chip{background:#f1f5f9;border-radius:20px;padding:2px 8px;font-size:11px;color:var(--soft);}
+
+/* ── CALENDRIER QUAND ── */
+.quand-card{background:white;border-radius:12px;border:1.5px solid var(--line);padding:12px;margin-bottom:8px;}
+.quand-mois{font-size:11px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.quand-action{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.quand-action:last-child{border-bottom:none;}
+.quand-ico{font-size:16px;flex-shrink:0;margin-top:1px;}
+.quand-urgent{color:var(--rouge);font-weight:700;}
+
+/* ── MODALS ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;}
+.modal-overlay.open{display:flex;}
+.modal{background:white;border-radius:18px;width:100%;max-width:560px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+.modal-h{background:linear-gradient(135deg,var(--vert),var(--vert2));color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+.modal-h h2{font-family:'DM Serif Display',serif;font-size:17px;}
+.modal-close{background:rgba(255,255,255,.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;}
+.modal-body{padding:18px;}
+.fg{margin-bottom:12px;}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.finput,.fsel,.ftxt{width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--ink);}
+.finput:focus,.fsel:focus,.ftxt:focus{outline:none;border-color:var(--vert);}
+.ftxt{resize:vertical;min-height:60px;}
+.btn-v{background:var(--vert);color:white;border:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:4px;}
+.btn-v:hover{opacity:.9;}
+.btn-sec{background:var(--bg);color:var(--soft);border:1.5px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;}
+
+/* ── FAB ── */
+#fab{position:fixed;bottom:24px;right:20px;background:var(--vert);color:white;border:none;border-radius:28px;padding:14px 22px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(45,106,79,.4);z-index:50;transition:transform .15s;}
+#fab:hover{transform:scale(1.04);}
+
+#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-size:40px;}
+#app{display:none;}
+.empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty .ico{font-size:44px;margin-bottom:10px;}
+
+/* Tag chips selector */
+.chips-sel{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border:1.5px solid var(--line);border-radius:16px;font-size:13px;cursor:pointer;transition:all .15s;color:var(--soft);}
+.chip.sel{background:var(--clair);border-color:var(--vert);color:var(--vert);font-weight:600;}
+</style>
+</head>
+<body>
+<div id="loading">🌱</div>
+<div id="app">
+
+<div id="header">
+  <button class="back-btn" onclick="location.href='index.html'">← Accueil</button>
+  <h1>🌱 Potager Syntropique</h1>
+  <button onclick="window._signOut()" style="background:rgba(255,255,255,.2);border:none;color:white;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;">⎋</button>
+</div>
+
+<div id="tabs">
+  <button class="tab active" onclick="switchTab('calcul')">📐 Calculs</button>
+  <button class="tab" onclick="switchTab('planches')" style="position:relative;">🗺️ Planches<span id="pert-badge" style="display:none;position:absolute;top:4px;right:6px;background:#dc2626;color:white;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px;"></span></button>
+  <button class="tab" onclick="switchTab('calendrier')">📅 Quand ?</button>
+  <button class="tab" onclick="switchTab('perturbations')">✂️ Perturbations</button>
+  <button class="tab" onclick="switchTab('sol')">🌍 Sol</button>
+  <button class="tab" onclick="switchTab('biblio')">🌿 Plantes</button>
+</div>
+
+<!-- ══ CALCULS BIOMASSE ══ -->
+<div class="section active" id="section-calcul">
+
+  <div class="card">
+    <div class="card-titre">📐 Vos chiffres clés</div>
+    <div style="font-size:13px;color:var(--soft);margin-bottom:12px;">400 m² · 30 planches 10m×1m · Sol argileux · Région parisienne</div>
+
+    <!-- Objectif biomasse -->
+    <div class="calc-box">
+      <div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🎯 Objectif : 70% biomasse</div>
+      <div class="calc-grid">
+        <div class="calc-item">
+          <div class="calc-nb">21</div>
+          <div class="calc-label">planches biomasse</div>
+        </div>
+        <div class="calc-item">
+          <div class="calc-nb">9</div>
+          <div class="calc-label">planches comestibles</div>
+        </div>
+        <div class="calc-item">
+          <div class="calc-nb">2</div>
+          <div class="calc-label">planches bordure<br>= 20m de haie au nord</div>
+        </div>
+        <div class="calc-item">
+          <div class="calc-nb">~4</div>
+          <div class="calc-label">mois jusqu'au<br>saut du chat 🐱</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tournesols -->
+    <div style="background:#fff0f3;border:1.5px solid #ffb3c1;border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:700;color:#c9184a;margin-bottom:8px;">🌻 Tournesols — planche de 10m × 1m</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#c9184a;">33</div>
+          <div style="font-size:11px;color:var(--muted);">plants / planche</div>
+        </div>
+        <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#c9184a;">693</div>
+          <div style="font-size:11px;color:var(--muted);">plants total (21 planches)</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#c9184a;line-height:1.5;">
+        <strong>Espacement :</strong> 30×30cm (3 rangs sur 1m de large)<br>
+        <strong>Semis :</strong> Mai directement en place, profondeur 2cm<br>
+        <strong>Perturbation :</strong> Couper à 60-80% de la hauteur, déposer au sol<br>
+        <strong>Resemis :</strong> Immédiatement après chaque perturbation
+      </div>
+    </div>
+
+    <!-- Maïs -->
+    <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">🌽 Maïs — planche de 10m × 1m</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#92400e;">20</div>
+          <div style="font-size:11px;color:var(--muted);">trous / planche</div>
+        </div>
+        <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#92400e;">3-6</div>
+          <div style="font-size:11px;color:var(--muted);">graines / trou (syntropie !)</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#92400e;line-height:1.5;">
+        <strong>Espacement :</strong> 50×40cm<br>
+        <strong>Total graines :</strong> 60 à 120 graines par planche<br>
+        <strong>Astuce Anaëlle Théry :</strong> Semer 3 à 6 graines dans le même trou pour la densité<br>
+        <strong>80% seront taillés</strong> et déposés au sol en mulch
+      </div>
+    </div>
+
+    <!-- Arbustes bordure -->
+    <div style="background:#e0f2fe;border:1.5px solid #38bdf8;border-radius:12px;padding:14px;">
+      <div style="font-size:13px;font-weight:700;color:#0369a1;margin-bottom:8px;">🌿 Design Tortue/Abeille — bordure protectrice</div>
+      <div style="font-size:12px;color:#0369a1;line-height:1.6;">
+        <strong>2 planches de bordure côté nord</strong> (10m × 1m chacune, côte à côte = 20m de haie)<br>
+        Espèces : cassis, groseille, sureau, cornouiller · espacement 80cm<br>
+        → <strong>~13 arbustes par planche</strong> × 2 planches = <strong>26 arbustes</strong><br>
+        (10m ÷ 0.80m = 12-13 arbustes sur 1 rang, dans la longueur de la planche)<br><br>
+        🐢 La <strong>Tortue</strong> = ces 20m de haie au nord protègent les 28 planches intérieures du vent froid<br>
+        🐝 L'<strong>Abeille</strong> = les fleurs de cassis et sureau attirent les pollinisateurs vers l'intérieur<br>
+        ⚠️ Les bordures ne font <strong>pas le tour</strong> du potager — uniquement le côté le plus exposé au vent
+        ⚠️ Les bordures ne font <strong>pas le tour</strong> du potager — uniquement le côté le plus exposé au vent
+        ⚠️ Les bordures ne font <strong>pas le tour</strong> du potager — uniquement le côté le plus exposé au vent
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicateur saut du chat -->
+  <div class="card">
+    <div class="card-titre">🐱 Progression vers le saut du chat</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Le saut du chat = le moment où le sol devient autonome en biomasse (~4 mois avec perturbations régulières)</div>
+    <div id="saut-pct-label" style="font-size:13px;font-weight:700;color:var(--vert);margin-bottom:4px;">0% — Début du voyage 🌱</div>
+    <div class="saut-bar"><div class="saut-fill" id="saut-fill" style="width:0%"></div></div>
+    <div class="saut-milestones">
+      <span>Plantation</span><span>1 mois</span><span>2 mois</span><span>Saut 🐱</span>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--soft);">
+      Le score augmente quand vous enregistrez des perturbations. Objectif : <strong>4-6 perturbations/mois</strong> en saison active.
+    </div>
+    <div id="saut-conseil" style="margin-top:8px;"></div>
+  </div>
+
+</div>
+
+<!-- ══ PLANCHES ══ -->
+<div class="section" id="section-planches">
+  <div class="card" style="padding:12px;">
+    <div class="card-titre">🗺️ Carte des 30 planches</div>
+    <div class="legende">
+      <div class="leg-item"><div class="leg-dot" style="background:#d8f3dc;border:1.5px solid var(--vert3);"></div><span>Biomasse</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#fff3cd;border:1.5px solid #ffc107;"></div><span>Comestible</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#cff4fc;border:1.5px solid #0ea5e9;"></div><span>Protection</span></div>
+    </div>
+    <div class="legende" style="margin-bottom:8px;">
+      <div class="leg-item"><div style="width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:2px;"></div><span style="font-size:11px;">OK (&lt;10j)</span></div>
+      <div class="leg-item"><div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:2px;"></div><span style="font-size:11px;">Bientôt (10-21j)</span></div>
+      <div class="leg-item"><div style="width:8px;height:8px;border-radius:50%;background:#dc2626;margin-right:2px;"></div><span style="font-size:11px;">Urgent (&gt;21j)</span></div>
+      <div class="leg-item"><div style="width:8px;height:8px;border-radius:50%;background:#adb5bd;margin-right:2px;"></div><span style="font-size:11px;">Jamais</span></div>
+    </div>
+    <!-- Zone haie nord -->
+    <div id="planches-haie-label">
+      <span style="display:inline-block;width:14px;height:8px;background:#cff4fc;border:1.5px solid #0ea5e9;border-radius:2px;"></span>
+      🐢 Haie protectrice Nord (planches 1-2)
+    </div>
+    <div id="planches-haie"></div>
+    <!-- Zone intérieure -->
+    <div id="planches-interieur-label">
+      <span style="display:inline-block;width:10px;height:10px;background:#d8f3dc;border:1.5px solid var(--vert3);border-radius:2px;"></span>
+      Planches intérieures (3-30)
+    </div>
+    <div id="planches-grid"></div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;">Clique sur une planche pour la configurer · point coloré = statut perturbation</div>
+  </div>
+
+  <div id="planche-detail-zone"></div>
+</div>
+
+<!-- ══ CALENDRIER QUAND ══ -->
+<div class="section" id="section-calendrier">
+  <div style="background:linear-gradient(135deg,#d8f3dc,#b7e4c7);border-radius:14px;padding:14px;margin-bottom:14px;border:1.5px solid var(--vert3);">
+    <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--vert);margin-bottom:4px;">📅 Quoi faire et quand ?</div>
+    <div style="font-size:12px;color:var(--soft);">Calendrier adapté à la région parisienne, sol argileux — démarrage mai</div>
+  </div>
+  <div id="calendrier-content"></div>
+</div>
+
+<!-- ══ PERTURBATIONS ══ -->
+<div class="section" id="section-perturbations">
+  <div class="card">
+    <div class="card-titre">✂️ Journal des perturbations</div>
+    <div style="font-size:12px;color:var(--soft);margin-bottom:12px;">
+      Une perturbation = tailler, couper, déposer au sol. C'est le moteur de la syntropie : chaque coup de sécateur envoie un signal "il faut pousser !" à tout l'écosystème.
+    </div>
+    <button class="btn-v" onclick="openModalPerturbation()">+ Enregistrer une perturbation aujourd'hui</button>
+  </div>
+  <div id="perturbations-list"></div>
+</div>
+
+<!-- ══ SOL ══ -->
+<div class="section" id="section-sol">
+  <div class="card">
+    <div class="card-titre">🌍 Suivi du sol argileux</div>
+    <div style="background:#fef9c3;border:1.5px solid var(--amber);border-radius:10px;padding:10px;font-size:12px;color:#7c3a00;margin-bottom:14px;line-height:1.5;">
+      💡 <strong>Sol argileux parisien :</strong> riche en nutriments mais compacte facilement. La syntropie est idéale — le mulch permanent le réchauffe et évite la battance.
+    </div>
+    <button class="btn-v" onclick="openModalSol()">+ Enregistrer une observation du sol</button>
+  </div>
+  <div id="sol-list"></div>
+</div>
+
+<!-- ══ BIBLIOTHÈQUE ══ -->
+<div class="section" id="section-biblio">
+  <div id="biblio-content"></div>
+</div>
+
+<button id="fab" onclick="onFabClick()">+</button>
+</div><!-- fin #app -->
+
+<!-- ══ MODAL PLANCHE ══ -->
+<div class="modal-overlay" id="modal-planche">
+  <div class="modal">
+    <div class="modal-h">
+      <h2 id="mp-titre">Planche</h2>
+      <button class="modal-close" onclick="closeModal('modal-planche')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Rôle de la planche</label>
+        <div class="chips-sel" id="mp-role-chips">
+          <div class="chip sel" data-val="biomasse" onclick="selectChip(this,'mp-role-chips')">🌻 Biomasse</div>
+          <div class="chip" data-val="comestible" onclick="selectChip(this,'mp-role-chips')">🥕 Comestible</div>
+          <div class="chip" data-val="protection" onclick="selectChip(this,'mp-role-chips')">🌿 Protection</div>
+          <div class="chip" data-val="vide" onclick="selectChip(this,'mp-role-chips')">⬜ Vide</div>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Plantes principales</label>
+        <div id="mp-plantes-tags" style="margin-bottom:6px;min-height:24px;"></div>
+        <input type="text" class="finput" id="mp-plante-input" placeholder="Ex: Tournesol, Maïs, Tomate…" list="plantes-sugg">
+        <datalist id="plantes-sugg">
+          <option value="Tournesol"><option value="Maïs"><option value="Consoude"><option value="Ortie"><option value="Topinambour">
+          <option value="Amarante"><option value="Tomate"><option value="Courgette"><option value="Haricot"><option value="Courge">
+          <option value="Radis"><option value="Laitue"><option value="Épinard"><option value="Carotte"><option value="Betterave">
+          <option value="Cassis"><option value="Groseille"><option value="Sureau"><option value="Cornouiller"><option value="Lavande">
+        </datalist>
+        <button class="btn-sec" style="margin-top:6px;font-size:13px;padding:7px 14px;" onclick="ajouterPlantePlanche()">+ Ajouter</button>
+      </div>
+      <div class="fg">
+        <label>Notes</label>
+        <textarea class="ftxt" id="mp-notes" placeholder="Associations, observations, particularités…"></textarea>
+      </div>
+      <button class="btn-v" onclick="savePlanche()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PERTURBATION ══ -->
+<div class="modal-overlay" id="modal-perturbation">
+  <div class="modal">
+    <div class="modal-h">
+      <h2>✂️ Perturbation</h2>
+      <button class="modal-close" onclick="closeModal('modal-perturbation')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Date</label>
+        <input type="date" class="finput" id="fp-date">
+      </div>
+      <div class="fg">
+        <label>Type(s) de perturbation</label>
+        <div class="chips-sel" id="fp-types-chips" style="gap:6px;">
+          <div class="chip" data-val="taille" onclick="toggleChip(this)">✂️ Taille / coupe</div>
+          <div class="chip" data-val="mulch" onclick="toggleChip(this)">🍂 Dépôt au sol</div>
+          <div class="chip" data-val="resemis" onclick="toggleChip(this)">🌱 Resemis</div>
+          <div class="chip" data-val="decompactage" onclick="toggleChip(this)">🪱 Décompactage</div>
+          <div class="chip" data-val="ajout-biomasse" onclick="toggleChip(this)">🌿 Ajout biomasse externe</div>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Planches concernées (optionnel)</label>
+        <input type="text" class="finput" id="fp-planches" placeholder="Ex: 1, 3, 5 ou toutes">
+      </div>
+      <div class="fg">
+        <label>Effets observés (avant / après)</label>
+        <textarea class="ftxt" id="fp-effets" placeholder="Ex: Sol moins compact, nouvelles pousses visibles après 5 jours, odeur de terre vivante…"></textarea>
+      </div>
+      <div class="fg">
+        <label>Intensité de la perturbation</label>
+        <div style="display:flex;gap:8px;">
+          <button class="chip" data-val="douce" onclick="selectChip(this,'fp-intensite-chips')" id="fp-intensite-chips" style="display:none;"></button>
+        </div>
+        <div class="chips-sel" id="fp-intensite-chips2">
+          <div class="chip sel" data-val="douce" onclick="selectChip(this,'fp-intensite-chips2')">🌿 Douce</div>
+          <div class="chip" data-val="moderee" onclick="selectChip(this,'fp-intensite-chips2')">✂️ Modérée</div>
+          <div class="chip" data-val="forte" onclick="selectChip(this,'fp-intensite-chips2')">🪚 Forte (50%+)</div>
+        </div>
+      </div>
+      <button class="btn-v" onclick="savePerturbation()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL SOL ══ -->
+<div class="modal-overlay" id="modal-sol">
+  <div class="modal">
+    <div class="modal-h">
+      <h2>🌍 Observation du sol</h2>
+      <button class="modal-close" onclick="closeModal('modal-sol')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Date</label>
+        <input type="date" class="finput" id="fs-date">
+      </div>
+      <div class="obs-card" style="margin-bottom:10px;">
+        <div class="obs-titre">💧 Humidité du sol</div>
+        <input type="range" class="obs-slider" id="fs-humidite" min="0" max="5" step="1" value="3">
+        <div class="obs-emojis"><span>🏜️ Très sec</span><span>😐 Moyen</span><span>🌊 Très humide</span></div>
+      </div>
+      <div class="obs-card" style="margin-bottom:10px;">
+        <div class="obs-titre">🪨 Compaction</div>
+        <input type="range" class="obs-slider" id="fs-compaction" min="0" max="5" step="1" value="3">
+        <div class="obs-emojis"><span>🪶 Meuble</span><span>😐 Normal</span><span>🧱 Béton</span></div>
+      </div>
+      <div class="obs-card" style="margin-bottom:10px;">
+        <div class="obs-titre">🪱 Vers de terre (en 10 minutes de bêchage)</div>
+        <div class="chips-sel" id="fs-vers-chips">
+          <div class="chip sel" data-val="0" onclick="selectChip(this,'fs-vers-chips')">0️⃣ Aucun</div>
+          <div class="chip" data-val="1" onclick="selectChip(this,'fs-vers-chips')">1️⃣ 1-3</div>
+          <div class="chip" data-val="2" onclick="selectChip(this,'fs-vers-chips')">✌️ 4-10</div>
+          <div class="chip" data-val="3" onclick="selectChip(this,'fs-vers-chips')">🪱 10+</div>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Observations libres</label>
+        <textarea class="ftxt" id="fs-notes" placeholder="Couleur du sol, odeur, présence de champignons, craquelures…"></textarea>
+      </div>
+      <button class="btn-v" onclick="saveSol()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DONNÉES
+// ══════════════════════════════════════════════════════
+var data = {
+  planches: Array.from({length:30}, (_,i) => ({
+    id: i+1,
+    role: i < 2 ? 'protection' : (i < 23 ? 'biomasse' : 'comestible'),
+    plantes: i === 0 ? ['Cassis','Sureau','Groseille'] :
+             i === 1 ? ['Cornouiller','Lavande','Groseille'] :
+             i < 23  ? ['Tournesol','Maïs'] : [],
+    notes: i === 0 ? 'Bordure nord gauche — 13 arbustes espacés 80cm sur 10m' :
+           i === 1 ? 'Bordure nord droite — 13 arbustes espacés 80cm sur 10m' : ''
+  })),
+  perturbations: [],
+  sol: [],
+};
+
+var tabActif = 'calcul';
+var plancheSelectee = null;
+var _plantesTmp = [];
+
+function uidG(){ return '_' + Date.now() + Math.random().toString(36).slice(2,6); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function load(){
+  try{ var d=JSON.parse(localStorage.getItem('potagersyntro')||'null'); if(d){ data.perturbations=d.perturbations||[]; data.sol=d.sol||[]; if(d.planches&&d.planches.length===30) data.planches=d.planches; } }catch(e){}
+}
+function save(){
+  localStorage.setItem('potagersyntro', JSON.stringify(data));
+  syncFirestore();
+}
+
+// ══════════════════════════════════════════════════════
+// FIREBASE
+// ══════════════════════════════════════════════════════
+window._initSync = function(uid){
+  load(); renderAll();
+  var {db, doc, onSnapshot, setDoc} = window._fb;
+  var ref = doc(db,'users',uid,'modules','potager');
+  onSnapshot(ref, function(snap){
+    if(!snap.exists()) return;
+    var d=snap.data();
+    if(d.perturbations) data.perturbations=d.perturbations;
+    if(d.sol) data.sol=d.sol;
+    if(d.planches&&d.planches.length===30) data.planches=d.planches;
+    renderAll();
+  });
+  window._pushPotager = async function(){
+    try{ await setDoc(ref, {perturbations:data.perturbations, sol:data.sol, planches:data.planches}, {merge:true}); }
+    catch(e){ console.warn('sync potager',e); }
+  };
+};
+var _syncT=null;
+function syncFirestore(){ clearTimeout(_syncT); _syncT=setTimeout(function(){ window._pushPotager&&window._pushPotager(); },800); }
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function switchTab(t){
+  tabActif=t;
+  document.querySelectorAll('.tab').forEach(function(b,i){
+    var tabs=['calcul','planches','calendrier','perturbations','sol','biblio'];
+    b.classList.toggle('active', tabs[i]===t);
+  });
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
+  document.getElementById('section-'+t).classList.add('active');
+  var fab=document.getElementById('fab');
+  fab.style.display=({planches:1,perturbations:1,sol:1}[t])?'':'none';
+  if(t==='planches') renderPlanches();
+  if(t==='perturbations') renderPerturbations();
+  if(t==='sol') renderSol();
+  if(t==='biblio') renderBiblio();
+  if(t==='calendrier') renderCalendrier();
+  if(t==='calcul') updateSautDuChat();
+}
+
+function onFabClick(){
+  if(tabActif==='planches') { alert('Clique directement sur une planche dans la carte !'); return; }
+  if(tabActif==='perturbations') openModalPerturbation();
+  if(tabActif==='sol') openModalSol();
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function renderAll(){
+  if(tabActif==='planches') renderPlanches();
+  if(tabActif==='perturbations') renderPerturbations();
+  if(tabActif==='sol') renderSol();
+  updateSautDuChat();
+}
+
+// ══════════════════════════════════════════════════════
+// SAUT DU CHAT
+// ══════════════════════════════════════════════════════
+function updateSautDuChat(){
+  // Score basé sur nb perturbations des 4 derniers mois
+  var cutoff = new Date(); cutoff.setMonth(cutoff.getMonth()-4);
+  var recentes = data.perturbations.filter(function(p){ return new Date(p.date)>=cutoff; });
+  // Objectif : 4-6 perturbations/mois pendant 4 mois = 16-24 perturbations
+  var pct = Math.min(100, Math.round(recentes.length / 20 * 100));
+  var el = document.getElementById('saut-fill');
+  var label = document.getElementById('saut-pct-label');
+  var conseil = document.getElementById('saut-conseil');
+  if(!el) return;
+  el.style.width = pct + '%';
+  var msgs = ['🌱 Début du voyage','🌿 Les racines s\'installent','🌻 La biomasse s\'accumule','🐱 Saut du chat proche !','🎉 SAUT DU CHAT atteint !'];
+  var idx = Math.floor(pct/25);
+  if(label) label.textContent = pct + '% — ' + msgs[Math.min(idx, msgs.length-1)];
+  if(conseil){
+    var restant = Math.max(0, 20 - recentes.length);
+    if(pct>=100){
+      conseil.innerHTML = '<div style="background:#d8f3dc;border:1.5px solid var(--vert3);border-radius:10px;padding:10px;font-size:12px;color:var(--vert);font-weight:600;">🎉 Bravo ! Votre sol est en plein saut du chat — il s\'auto-fertilise désormais !</div>';
+    } else {
+      conseil.innerHTML = '<div style="background:#fffbeb;border:1.5px solid var(--amber);border-radius:10px;padding:10px;font-size:12px;color:var(--terre);">Encore ~'+restant+' perturbation'+(restant>1?'s':'')+' pour atteindre le saut du chat. Objectif : tailler chaque planche au moins 1× ce mois-ci.</div>';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PLANCHES
+// ══════════════════════════════════════════════════════
+var COLORS = { biomasse:'#d8f3dc', comestible:'#fff3cd', protection:'#cff4fc', vide:'#f8f9fa' };
+var BORDERS = { biomasse:'var(--vert3)', comestible:'#ffc107', protection:'#0ea5e9', vide:'#dee2e6' };
+var COLORS_TEXT = { biomasse:'var(--vert)', comestible:'#856404', protection:'#0369a1', vide:'#adb5bd' };
+var ROLE_ICO = { biomasse:'🌻', comestible:'🥕', protection:'🌿', vide:'⬜' };
+
+function renderPlanches(){
+  var haie = document.getElementById('planches-haie');
+  var g = document.getElementById('planches-grid');
+
+  function cellHtml(p, isHaie){
+    var sel = plancheSelectee===p.id ? ' selected' : '';
+    var ico = ROLE_ICO[p.role] || '⬜';
+    var dernPert = getDernierePerturbation(p.id);
+    var joursJ = dernPert ? Math.floor((Date.now()-new Date(dernPert))/86400000) : null;
+    var dotColor = '#adb5bd';
+    var pertLabel = 'Jamais perturbée';
+    if(p.role !== 'vide' && joursJ !== null){
+      if(joursJ > 21){ dotColor='#dc2626'; pertLabel='🔴 '+joursJ+'j — URGENT'; }
+      else if(joursJ > 10){ dotColor='#f59e0b'; pertLabel='🟡 '+joursJ+'j'; }
+      else { dotColor='#16a34a'; pertLabel='🟢 '+joursJ+'j — OK'; }
+    }
+    var dot = p.role!=='vide' ? '<div class="planche-pert-dot" style="background:'+dotColor+';"></div>' : '';
+    var roleLabel = {biomasse:'Biomasse', comestible:'Comestible', protection:'Haie Nord', vide:'Vide'}[p.role]||'';
+    var extraClass = isHaie ? ' haie' : '';
+    return '<div class="planche-cell '+p.role+sel+extraClass+'" onclick="selectPlanche('+p.id+')">' +
+      '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">'+
+        '<div class="planche-num">#'+p.id+'</div>'+
+        '<div class="planche-ico">'+ico+'</div>'+
+        '<div style="font-size:8px;color:'+COLORS_TEXT[p.role]+';font-weight:700;margin-left:auto;">'+roleLabel+'</div>'+
+      '</div>'+
+      (p.plantes.length > 0
+        ? '<div class="planche-plantes">'+esc(p.plantes.join(', '))+'</div>'
+        : '<div class="planche-plantes" style="opacity:.5;">Vide</div>')+
+      (p.notes ? '<div class="planche-notes-preview">'+esc(p.notes)+'</div>' : '')+
+      (p.role!=='vide' ? '<div style="font-size:8px;margin-top:auto;padding-top:4px;font-weight:600;color:'+dotColor+';">'+pertLabel+'</div>' : '')+
+      dot+
+    '</div>';
+  }
+
+  // Haie nord = planches protection (les 2 premières)
+  var haieItems = data.planches.filter(function(p){ return p.role==='protection'; });
+  haie.innerHTML = haieItems.map(function(p){ return cellHtml(p, true); }).join('');
+
+  // Planches intérieures = tout le reste
+  var g = document.getElementById('planches-grid');
+  g.innerHTML = data.planches.filter(function(p){ return p.role!=='protection'; }).map(function(p){
+    return cellHtml(p, false);
+  }).join('');
+  // Compter les planches urgentes pour le badge
+  var urgentes = data.planches.filter(function(p){
+    if(p.role==='vide') return false;
+    var d=getDernierePerturbation(p.id);
+    var j=d?Math.floor((Date.now()-new Date(d))/86400000):999;
+    return j>21;
+  }).length;
+  var badge=document.getElementById('pert-badge');
+  if(badge){ badge.style.display=urgentes>0?'':'none'; badge.textContent=urgentes; }
+  renderPlancheDetail();
+}
+
+function selectPlanche(id){
+  plancheSelectee = plancheSelectee===id ? null : id;
+  renderPlanches();
+}
+
+function renderPlancheDetail(){
+  var z = document.getElementById('planche-detail-zone');
+  if(!plancheSelectee){ z.innerHTML=''; return; }
+  var p = data.planches.find(function(x){return x.id===plancheSelectee;});
+  if(!p){ z.innerHTML=''; return; }
+  var roles = { biomasse:'🌻 Biomasse', comestible:'🥕 Comestible', protection:'🌿 Protection', vide:'⬜ Vide' };
+  // Dernière perturbation de cette planche
+  var dernPert = getDernierePerturbation(p.id);
+  var joursDepuisPert = dernPert ? Math.floor((Date.now()-new Date(dernPert))/86400000) : null;
+  var alertCouleur = joursDepuisPert === null ? '#f8f9fa' : joursDepuisPert > 21 ? '#fee2e2' : joursDepuisPert > 10 ? '#fff3cd' : '#d8f3dc';
+  var alertTexte = joursDepuisPert === null ? '⚪ Jamais perturbée' : joursDepuisPert > 21 ? '🔴 '+joursDepuisPert+'j sans perturbation — URGENT !' : joursDepuisPert > 10 ? '🟡 '+joursDepuisPert+'j — Perturbation bientôt' : '🟢 '+joursDepuisPert+'j — OK';
+
+  z.innerHTML = '<div class="planche-detail">'+
+    '<div class="planche-detail-titre">Planche #'+p.id+' — '+roles[p.role]+'</div>'+
+    // Indicateur perturbation
+    '<div style="background:'+alertCouleur+';border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:10px;">'+alertTexte+'</div>'+
+    // Plantes
+    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">'+
+      p.plantes.map(function(pl){ return '<span class="plante-tag">'+esc(pl)+'</span>'; }).join('')+
+      (p.plantes.length===0?'<span style="font-size:12px;color:var(--muted);">Aucune plante configurée</span>':'')+
+    '</div>'+
+    // Notes directement éditables
+    '<div style="margin-bottom:10px;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📝 Notes</div>'+
+      '<textarea id="planche-notes-live" placeholder="Observations, associations, particularités de cette planche…" '+
+        'style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;color:var(--ink);" '+
+        'oninput="savePLancheNotes('+p.id+',this.value)">'+esc(p.notes)+'</textarea>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;">'+
+      '<button onclick="editPlanche('+p.id+')" style="flex:1;background:var(--vert);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✏️ Modifier plantes</button>'+
+      '<button onclick="enregistrerPerturbationRapide('+p.id+')" style="flex:1;background:#c9184a;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✂️ Perturbée !</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function savePLancheNotes(id, val){
+  var p = data.planches.find(function(x){return x.id===id;});
+  if(!p) return;
+  p.notes = val;
+  // Debounce save
+  clearTimeout(window._notesTimer);
+  window._notesTimer = setTimeout(function(){ save(); }, 800);
+}
+
+function enregistrerPerturbationRapide(plancheId){
+  // Enregistre une perturbation rapide "taille" pour cette planche
+  data.perturbations.unshift({
+    id: uidG(),
+    date: today(),
+    types: ['taille'],
+    planches: String(plancheId),
+    effets: '',
+    intensite: 'douce',
+  });
+  save();
+  addPerturbationTodos();
+  renderPlanches(); // rafraîchit le détail avec le nouveau statut
+  updateSautDuChat();
+}
+
+function getDernierePerturbation(plancheId){
+  // Cherche la dernière perturbation mentionnant cette planche
+  for(var i=0; i<data.perturbations.length; i++){
+    var p=data.perturbations[i];
+    var planches=String(p.planches||'').toLowerCase();
+    if(planches==='' || planches==='toutes' || planches.includes(String(plancheId))){
+      return p.date;
+    }
+  }
+  return null;
+}
+
+function editPlanche(id){
+  var p = data.planches.find(function(x){return x.id===id;});
+  if(!p) return;
+  document.getElementById('mp-titre').textContent = 'Planche #'+id;
+  // Rôle
+  document.querySelectorAll('#mp-role-chips .chip').forEach(function(c){
+    c.classList.toggle('sel', c.dataset.val===p.role);
+  });
+  // Plantes
+  _plantesTmp = p.plantes.slice();
+  renderPlantesTags();
+  document.getElementById('mp-plante-input').value='';
+  document.getElementById('mp-notes').value=p.notes||'';
+  openModal('modal-planche');
+}
+
+function renderPlantesTags(){
+  var z = document.getElementById('mp-plantes-tags');
+  z.innerHTML = _plantesTmp.map(function(pl,i){
+    return '<span class="plante-tag remove" onclick="removePlanteTmp('+i+')">'+esc(pl)+' ×</span>';
+  }).join('');
+}
+
+function removePlanteTmp(i){ _plantesTmp.splice(i,1); renderPlantesTags(); }
+
+function ajouterPlantePlanche(){
+  var val = document.getElementById('mp-plante-input').value.trim();
+  if(!val) return;
+  if(!_plantesTmp.includes(val)) _plantesTmp.push(val);
+  document.getElementById('mp-plante-input').value='';
+  renderPlantesTags();
+}
+
+function savePlanche(){
+  if(!plancheSelectee) return;
+  var p = data.planches.find(function(x){return x.id===plancheSelectee;});
+  if(!p) return;
+  p.role = getChipVal('mp-role-chips') || 'biomasse';
+  p.plantes = _plantesTmp.slice();
+  p.notes = document.getElementById('mp-notes').value.trim();
+  save(); renderPlanches(); closeModal('modal-planche');
+}
+
+// ══════════════════════════════════════════════════════
+// PERTURBATIONS
+// ══════════════════════════════════════════════════════
+function openModalPerturbation(){
+  document.getElementById('fp-date').value = today();
+  document.getElementById('fp-planches').value = '';
+  document.getElementById('fp-effets').value = '';
+  document.querySelectorAll('#fp-types-chips .chip').forEach(function(c){ c.classList.remove('sel'); });
+  document.querySelectorAll('#fp-intensite-chips2 .chip').forEach(function(c,i){ c.classList.toggle('sel',i===0); });
+  openModal('modal-perturbation');
+}
+
+function savePerturbation(){
+  var types = [];
+  document.querySelectorAll('#fp-types-chips .chip.sel').forEach(function(c){ types.push(c.dataset.val); });
+  if(types.length===0){ alert('Choisis au moins un type !'); return; }
+  var dateP = document.getElementById('fp-date').value || today();
+  data.perturbations.unshift({
+    id: uidG(),
+    date: dateP,
+    types: types,
+    planches: document.getElementById('fp-planches').value.trim(),
+    effets: document.getElementById('fp-effets').value.trim(),
+    intensite: getChipVal('fp-intensite-chips2') || 'douce',
+  });
+  save(); renderPerturbations(); updateSautDuChat();
+  addPerturbationTodos();
+  closeModal('modal-perturbation');
+}
+
+function renderPerturbations(){
+  var el = document.getElementById('perturbations-list');
+  if(data.perturbations.length===0){
+    el.innerHTML='<div class="empty"><div class="ico">✂️</div><p>Aucune perturbation enregistrée.<br>La première taille est la plus importante !</p></div>';
+    return;
+  }
+  var PERT_LABEL = { taille:'✂️ Taille/coupe', mulch:'🍂 Dépôt sol', resemis:'🌱 Resemis', decompactage:'🪱 Décompactage', 'ajout-biomasse':'🌿 Ajout biomasse' };
+  var INT_COLOR = { douce:'#d8f3dc', moderee:'#fff3cd', forte:'#fce7f3' };
+  el.innerHTML = data.perturbations.map(function(p,i){
+    var typesHtml = p.types.map(function(t){ return '<span style="background:#f1f5f9;border-radius:12px;padding:2px 8px;font-size:11px;">'+( PERT_LABEL[t]||t)+'</span>'; }).join(' ');
+    return '<div class="card" style="margin-bottom:10px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+
+        '<div><div style="font-weight:700;font-size:14px;">'+esc(p.date)+'</div>'+
+        (p.planches ? '<div style="font-size:11px;color:var(--muted);">Planches : '+esc(p.planches)+'</div>' : '')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;align-items:center;">'+
+          '<span style="background:'+INT_COLOR[p.intensite||'douce']+';border-radius:8px;padding:2px 8px;font-size:11px;font-weight:600;">'+esc(p.intensite||'douce')+'</span>'+
+          '<button onclick="suppPert('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;">×</button>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">'+typesHtml+'</div>'+
+      (p.effets ? '<div style="background:#f8fdf9;border-left:3px solid var(--vert3);padding:8px 10px;border-radius:0 8px 8px 0;font-size:12px;color:var(--soft);font-style:italic;">'+esc(p.effets)+'</div>' : '')+
+    '</div>';
+  }).join('');
+}
+
+function suppPert(i){ data.perturbations.splice(i,1); save(); renderPerturbations(); updateSautDuChat(); }
+
+// ── To-dos automatiques dans le planificateur ──
+function addPerturbationTodos(){
+  try{
+    var todos = JSON.parse(localStorage.getItem('plannerTodos')||'{}');
+    // Supprimer les anciens rappels de perturbation potager
+    Object.keys(todos).forEach(function(date){
+      todos[date]=(todos[date]||[]).filter(function(t){ return !t._potager_pert; });
+    });
+    // Créer des rappels tous les 10 jours pendant les 4 prochaines semaines
+    var frequences = [7, 14, 21, 28]; // jours après aujourd'hui
+    // Trouver les planches actives (non vides)
+    var planchesActives = data.planches.filter(function(p){return p.role!=='vide';}).length;
+    frequences.forEach(function(j){
+      var d = new Date(); d.setDate(d.getDate()+j);
+      var ds = d.toISOString().slice(0,10);
+      if(!todos[ds]) todos[ds]=[];
+      // Vérifier si un rappel existe déjà ce jour
+      var already = todos[ds].some(function(t){return t._potager_pert;});
+      if(!already){
+        todos[ds].push({
+          id: uidG(),
+          text: '✂️ Perturber le potager syntropique ('+planchesActives+' planches actives)',
+          completed: false,
+          created: new Date().toISOString(),
+          _potager_pert: true,
+        });
+      }
+    });
+    localStorage.setItem('plannerTodos', JSON.stringify(todos));
+    // Pousser vers Firebase
+    if(window._fb && window._currentUser){
+      var fb=window._fb;
+      fb.setDoc(fb.doc(fb.db,'users',window._currentUser.uid),
+        {plannerTodos: JSON.stringify(todos)}, {merge:true}
+      ).catch(function(e){console.warn('push todos potager',e);});
+    }
+  }catch(e){ console.warn('addPerturbationTodos',e); }
+}
+
+// ── Résumé hebdomadaire automatique le lundi ──
+function addResumeLundi(){
+  try{
+    var today_ = new Date();
+    // Trouver le prochain lundi
+    var dayOfWeek = today_.getDay();
+    var daysUntilMonday = dayOfWeek===1?7:(8-dayOfWeek)%7||7;
+    var lundi = new Date(today_); lundi.setDate(today_.getDate()+daysUntilMonday);
+    var lundiStr = lundi.toISOString().slice(0,10);
+
+    var todos = JSON.parse(localStorage.getItem('plannerTodos')||'{}');
+    if(!todos[lundiStr]) todos[lundiStr]=[];
+
+    // Planches urgentes
+    var urgentes = data.planches.filter(function(p){
+      if(p.role==='vide') return false;
+      var d=getDernierePerturbation(p.id);
+      var j=d?Math.floor((Date.now()-new Date(d))/86400000):999;
+      return j>14;
+    });
+
+    if(urgentes.length>0){
+      var already=todos[lundiStr].some(function(t){return t._potager_lundi;});
+      if(!already){
+        var nums=urgentes.slice(0,6).map(function(p){return '#'+p.id;}).join(', ');
+        todos[lundiStr].push({
+          id: uidG(),
+          text: '🌱 Potager — planches à perturber cette semaine : '+nums+(urgentes.length>6?' + '+(urgentes.length-6)+' autres':''),
+          completed: false,
+          created: new Date().toISOString(),
+          _potager_lundi: true,
+        });
+        localStorage.setItem('plannerTodos', JSON.stringify(todos));
+        if(window._fb && window._currentUser){
+          var fb=window._fb;
+          fb.setDoc(fb.doc(fb.db,'users',window._currentUser.uid),
+            {plannerTodos: JSON.stringify(todos)}, {merge:true}
+          ).catch(function(e){});
+        }
+      }
+    }
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════
+// SOL
+// ══════════════════════════════════════════════════════
+var CONSEILS_SOL = [
+  'Sol très sec — arrosez légèrement au pied + ajoutez une couche de mulch épaisse (5-10cm). Sur sol argileux, arrosez lentement pour éviter le ruissellement.',
+  'Sol modérément sec — Le mulch aide à conserver l\'humidité. Vérifiez la profondeur de sécheresse avec un doigt.',
+  'Bonne humidité — C\'est parfait ! Le sol argileux retient bien l\'eau, continuez le mulch.',
+  'Sol bien humide — Évitez de travailler le sol argileux humide (compaction). Attendez.',
+  'Sol très humide — Risque d\'asphyxie racinaire. Pas d\'arrosage, vérifiez le drainage.',
+  'Sol gorgé d\'eau — Urgence drainage. Le mulch peut parfois aggraver la situation temporairement.',
+];
+var VERS_CONSEILS = ['Pas de vers — Sol encore peu vivant ou trop acide/sec. Continuez le mulch, les vers arrivent avec le temps.','Peu de vers — Bon début ! Le mulch et la biomasse vont les attirer.','Bonne faune lombricienne — Le sol se structure bien. Continuez !','Très nombreux vers 🎉 — Sol en excellente santé ! Vous approchez du saut du chat.'];
+
+function openModalSol(){
+  document.getElementById('fs-date').value=today();
+  document.getElementById('fs-humidite').value=3;
+  document.getElementById('fs-compaction').value=3;
+  document.querySelectorAll('#fs-vers-chips .chip').forEach(function(c,i){c.classList.toggle('sel',i===0);});
+  document.getElementById('fs-notes').value='';
+  openModal('modal-sol');
+}
+
+function saveSol(){
+  data.sol.unshift({
+    id: uidG(),
+    date: document.getElementById('fs-date').value||today(),
+    humidite: parseInt(document.getElementById('fs-humidite').value),
+    compaction: parseInt(document.getElementById('fs-compaction').value),
+    vers: parseInt(getChipVal('fs-vers-chips')||'0'),
+    notes: document.getElementById('fs-notes').value.trim(),
+  });
+  save(); renderSol(); closeModal('modal-sol');
+}
+
+function renderSol(){
+  var el = document.getElementById('sol-list');
+  if(data.sol.length===0){
+    el.innerHTML='<div class="empty"><div class="ico">🌍</div><p>Aucune observation du sol.<br>La première observation est la référence de départ !</p></div>';
+    return;
+  }
+  var HUMID = ['🏜️','🌵','😐','💧','🌧️','🌊'];
+  var COMPACT = ['🪶','😌','😐','😤','🧱','🪨'];
+  var VERS_E = ['0️⃣','🪱','🪱🪱','🪱🪱🪱'];
+  el.innerHTML = data.sol.map(function(s,i){
+    return '<div class="card" style="margin-bottom:10px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'+
+        '<div style="font-weight:700;font-size:14px;">'+esc(s.date)+'</div>'+
+        '<button onclick="suppSol('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;">×</button>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'+
+        '<div style="text-align:center;background:#f8fdf9;border-radius:8px;padding:8px;">'+
+          '<div style="font-size:22px;">'+HUMID[Math.min(s.humidite,5)]+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);">Humidité</div>'+
+        '</div>'+
+        '<div style="text-align:center;background:#f8fdf9;border-radius:8px;padding:8px;">'+
+          '<div style="font-size:22px;">'+COMPACT[Math.min(s.compaction,5)]+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);">Compaction</div>'+
+        '</div>'+
+        '<div style="text-align:center;background:#f8fdf9;border-radius:8px;padding:8px;">'+
+          '<div style="font-size:22px;">'+VERS_E[Math.min(s.vers,3)]+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);">Vers de terre</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="conseil-box">💡 '+esc(CONSEILS_SOL[Math.min(s.humidite,5)])+'</div>'+
+      (s.notes ? '<div style="margin-top:6px;font-size:12px;color:var(--soft);font-style:italic;">'+esc(s.notes)+'</div>' : '')+
+    '</div>';
+  }).join('');
+}
+
+function suppSol(i){ data.sol.splice(i,1); save(); renderSol(); }
+
+// ══════════════════════════════════════════════════════
+// CALENDRIER QUAND
+// ══════════════════════════════════════════════════════
+var CALENDRIER = [
+  { mois:'Mai — MAINTENANT 🚀', urgent:true, actions:[
+    { ico:'🌻', txt:'Semer tournesols directement en place (33/planche biomasse), profondeur 2cm', urgent:true },
+    { ico:'🌽', txt:'Semer maïs : 3 à 6 graines par trou, espacés 50cm (syntropie !)', urgent:true },
+    { ico:'🌿', txt:'Installer les arbustes de bordure (cassis, cornouiller) — ils ont besoin de s\'établir avant l\'été', urgent:true },
+    { ico:'🍂', txt:'Étaler une couche de mulch 5-10cm sur toutes les planches — PRIORITÉ sur sol argileux' },
+    { ico:'🥕', txt:'Planter les premières espèces comestibles : courgette, tomate, haricot' },
+  ]},
+  { mois:'Juin', actions:[
+    { ico:'✂️', txt:'Première grande perturbation : tailler 80% des tournesols à mi-hauteur, TOUT déposer au sol' },
+    { ico:'🌱', txt:'Resemer immédiatement après chaque taille (tournesol se ressème facilement)' },
+    { ico:'🪱', txt:'Observation sol : vérifier la compaction, grelinette si nécessaire' },
+    { ico:'💧', txt:'Sol argileux : arroser lentement au pied, pas en pluie — risque de battance' },
+  ]},
+  { mois:'Juillet', actions:[
+    { ico:'✂️', txt:'2ème perturbation : maïs et tournesols, encore plus intense si bien établis' },
+    { ico:'🌻', txt:'Les tournesols repoussent × 2 après taille — c\'est le signal du saut du chat !' },
+    { ico:'🍂', txt:'Consoude : commencer à installer et tailler régulièrement pour le sol' },
+    { ico:'🌿', txt:'Observer les arbustes de bordure : ils créent déjà un microclimat protecteur' },
+  ]},
+  { mois:'Août', actions:[
+    { ico:'🐱', txt:'SAUT DU CHAT potentiel : si vous avez fait 4-6 perturbations, le sol devrait montrer des signes d\'autonomie' },
+    { ico:'✂️', txt:'Continuer les perturbations — ne jamais laisser une planche sans taille >3 semaines en saison' },
+    { ico:'🌍', txt:'Observation vers de terre : compter sur 10min de bêchage superficiel' },
+    { ico:'🌱', txt:'Resemis automnaux : épinard, radis, mâche entre les plants de biomasse' },
+  ]},
+  { mois:'Septembre', actions:[
+    { ico:'✂️', txt:'Dernière grande perturbation avant l\'hiver : couper tout à ras et déposer au sol' },
+    { ico:'🍂', txt:'Épaissir le mulch pour protéger le sol argileux des pluies hivernales (évite la battance)' },
+    { ico:'🌿', txt:'Planter des engrais verts : féverole, trèfle, phacélie entre les planches' },
+    { ico:'🌱', txt:'Commencer les semis de printemps suivant en intérieur (tomates, poivrons)' },
+  ]},
+  { mois:'Octobre — Hiver', actions:[
+    { ico:'🌿', txt:'Le sol continue de se nourrir du mulch — NE PAS le retourner !' },
+    { ico:'📋', txt:'Planifier la saison suivante : répartir les planches, commander les graines' },
+    { ico:'🌱', txt:'Installer les arbustes et arbres fruitiers (octobre = meilleure période)' },
+    { ico:'📊', txt:'Analyser le journal des perturbations : quelles tailles ont eu les meilleurs effets ?' },
+  ]},
+];
+
+function renderCalendrier(){
+  var el = document.getElementById('calendrier-content');
+  el.innerHTML = CALENDRIER.map(function(m){
+    return '<div class="quand-card">'+
+      '<div class="quand-mois">'+(m.urgent?'🔴 ':'')+m.mois+'</div>'+
+      m.actions.map(function(a){
+        return '<div class="quand-action">'+
+          '<div class="quand-ico">'+a.ico+'</div>'+
+          '<div class="'+(a.urgent?'quand-urgent':'')+'">'+esc(a.txt)+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// BIBLIOTHÈQUE
+// ══════════════════════════════════════════════════════
+var PLANTES_LIB = [
+  { ico:'🌻', nom:'Tournesol', role:'biomasse', timing:'Semis mai-juin · Résultat 70 jours',
+    info:'Plante phare de la syntropie tempérée (Anaëlle Théry). Produit une biomasse énorme, se ressème facilement. Sur sol argileux, ses racines pivotantes décompactent en profondeur.',
+    quand:'Semer dès mai, directement en place. Tailler à 60% de hauteur, déposer au sol. Resemer immédiatement.',
+    assoc:['Maïs','Courgette','Haricot','Consoude'] },
+  { ico:'🌽', nom:'Maïs', role:'biomasse', timing:'Semis mai · 3-6 graines/trou',
+    info:'Semer dense (syntropie !) — 3 à 6 graines par trou. 80% seront taillés et déposés en mulch. Les 20% restants montent et créent de l\'ombre protectrice.',
+    quand:'Mai, après les saints de glace. En syntropie : plusieurs graines par trou pour maximiser la biomasse.',
+    assoc:['Tournesol','Courge','Haricot'] },
+  { ico:'🌿', nom:'Consoude', role:'biomasse', timing:'Plant ou bouture · Vivace',
+    info:'Reine de la biomasse sur sol argileux. Racines profondes (2m) qui remontent les minéraux. Riche en potassium. À tailler régulièrement, déposer au sol.',
+    quand:'Planter au printemps ou automne. Tailler dès que possible, 4-6 fois par saison.',
+    assoc:['Rosiers','Fruitiers','Tomate'] },
+  { ico:'🌱', nom:'Ortie', role:'biomasse', timing:'Spontanée ou bouture',
+    info:'Indicateur d\'un sol riche en azote. En syntropie, on la coupe et dépose au sol. Ses feuilles apportent beaucoup d\'azote facilement assimilable.',
+    quand:'La laisser pousser dans un coin, tailler avant floraison.',
+    assoc:['Tomate','Poivron','Groseille'] },
+  { ico:'🌼', nom:'Amarante', role:'biomasse', timing:'Semis mai-juin',
+    info:'Produit une biomasse colossale et très riche en protéines. Graines comestibles en bonus. Résiste bien à la sécheresse estivale.',
+    quand:'Semer mai-juin, en mélange avec tournesol. Tailler régulièrement.',
+    assoc:['Tournesol','Maïs','Quinoa'] },
+  { ico:'🥔', nom:'Topinambour', role:'biomasse+comestible', timing:'Planté mars-avril · Vivace',
+    info:'Vivace extraordinaire — revient seul chaque année. Biomasse aérienne taillée en été, tubercules récoltés en hiver. Décompacte le sol argileux.',
+    quand:'Planter tubercules mars-avril. Tailler les tiges dès 1m, déposer au sol. Récolter novembre-mars.',
+    assoc:['Consoude','Sureau'] },
+  { ico:'🍅', nom:'Tomate', role:'comestible', timing:'Repiquage mi-mai après saints de glace',
+    info:'En syntropie : toujours associée à de la biomasse (tournesol, amarante). La biomasse crée l\'ombre fraîche et le mulch conserve l\'humidité — idéal pour le sol argileux.',
+    quand:'Repiquer après le 15 mai en Île-de-France. Associer systématiquement avec biomasse.',
+    assoc:['Basilic','Consoude','Tournesol'] },
+  { ico:'🎃', nom:'Courge/Courgette', role:'comestible', timing:'Semis mai ou repiquage',
+    info:'Excellent couvre-sol — ses grandes feuilles protègent le sol argileux de la battance et de l\'évaporation. Pousse vite et produit beaucoup.',
+    quand:'Semer sous abri avril, repiquer mai. Laisser courir au sol entre les planches de biomasse.',
+    assoc:['Maïs','Haricot','Bourrache'] },
+  { ico:'🫐', nom:'Cassis', role:'protection+comestible', timing:'Plantation oct-mars',
+    info:'Arbuste de bordure idéal (design Tortue). Baies en juillet, feuilles aromatiques. Résiste au froid et au sol argileux. Fleurs très mellifères au printemps.',
+    quand:'Planter octobre-mars, espacer 80cm-1m. Taille légère après récolte.',
+    assoc:['Groseille','Lavande','Consoude'] },
+  { ico:'🌸', nom:'Sureau', role:'protection+comestible', timing:'Plantation oct-mars',
+    info:'Arbuste à croissance rapide — parfait pour créer rapidement la "carapace" de la Tortue. Fleurs en juin (beignets !), baies en août-septembre. Les fleurs attirent 100+ espèces d\'insectes.',
+    quand:'Planter automne-hiver. Peut pousser de 1,5m/an — structure la bordure rapidement.',
+    assoc:['Cassis','Cornouiller','Ortie'] },
+  { ico:'🌲', nom:'Cornouiller sanguin', role:'protection', timing:'Plantation oct-mars',
+    info:'Arbuste indigène très résistant — excellent pour le sol argileux. Baies comestibles pour les oiseaux (biodiversité). Très bonne plante d\'accompagnement.',
+    quand:'Planter en automne. Taille possible au sécateur pour stimuler. Très rustique.',
+    assoc:['Sureau','Prunellier','Rosier sauvage'] },
+  { ico:'💜', nom:'Lavande', role:'protection+aromatique', timing:'Plantation printemps-été',
+    info:'Attire les pollinisateurs (design Abeille). Résiste au sol argileux sec en été. Sépare les zones et crée des couloirs à insectes.',
+    quand:'Planter mai-juin. Tailler après floraison. Remplacer tous les 5-7 ans.',
+    assoc:['Romarin','Sauge','Groseille'] },
+];
+
+function renderBiblio(){
+  var el=document.getElementById('biblio-content');
+  el.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="biblio-filtres">'+
+    '<button class="chip sel" data-role="all" onclick="filterBiblio(this)">Toutes</button>'+
+    '<button class="chip" data-role="biomasse" onclick="filterBiblio(this)">🌻 Biomasse</button>'+
+    '<button class="chip" data-role="comestible" onclick="filterBiblio(this)">🥕 Comestible</button>'+
+    '<button class="chip" data-role="protection" onclick="filterBiblio(this)">🌿 Protection</button>'+
+  '</div>'+
+  '<div id="biblio-list">'+renderPlantesFiches('all')+'</div>';
+}
+
+function filterBiblio(btn){
+  document.querySelectorAll('#biblio-filtres .chip').forEach(function(c){c.classList.remove('sel');});
+  btn.classList.add('sel');
+  document.getElementById('biblio-list').innerHTML = renderPlantesFiches(btn.dataset.role);
+}
+
+function renderPlantesFiches(role){
+  return PLANTES_LIB.filter(function(p){ return role==='all'||p.role.includes(role); }).map(function(p){
+    return '<div class="plante-fiche">'+
+      '<div class="plante-fiche-header">'+
+        '<div class="plante-ico-big">'+p.ico+'</div>'+
+        '<div><div class="plante-nom">'+esc(p.nom)+'</div><div class="plante-role">'+esc(p.role)+'</div></div>'+
+      '</div>'+
+      '<div class="plante-info">'+esc(p.info)+'</div>'+
+      '<div class="plante-timing">🕐 '+esc(p.timing)+'</div>'+
+      '<div style="margin-top:6px;font-size:12px;color:var(--vert);font-weight:600;">📋 '+esc(p.quand)+'</div>'+
+      '<div class="assoc-chips">'+(p.assoc||[]).map(function(a){ return '<span class="assoc-chip">+'+esc(a)+'</span>'; }).join('')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS CHIPS
+// ══════════════════════════════════════════════════════
+function selectChip(el, groupId){
+  document.querySelectorAll('#'+groupId+' .chip').forEach(function(c){c.classList.remove('sel');});
+  el.classList.add('sel');
+}
+function toggleChip(el){ el.classList.toggle('sel'); }
+function getChipVal(groupId){
+  var sel=document.querySelector('#'+groupId+' .chip.sel');
+  return sel ? sel.dataset.val : null;
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+load();
+// Générer le résumé du lundi au chargement
+setTimeout(addResumeLundi, 2000);
+// Reste démarre via onAuthStateChanged → _initSync
+</script>
+</body>
+</html>

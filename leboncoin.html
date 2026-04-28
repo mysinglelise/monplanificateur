@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🪑 Le Bon Coin</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f97316">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Le Bon Coin">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, deleteDoc as _fbDeleteDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCnv0S78A8kK9vHHrzQKfYbX6NWM1UXRhs",
+    authDomain: "mon-planificateur-1e03c.firebaseapp.com",
+    projectId: "mon-planificateur-1e03c",
+    storageBucket: "mon-planificateur-1e03c.firebasestorage.app",
+    messagingSenderId: "978579425049",
+    appId: "1:978579425049:web:e53559ba2b80517c7c6788"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  window._fb = { auth, db, doc, setDoc, getDoc, onSnapshot, collection, deleteDoc: _fbDeleteDoc, signOut };
+  window._signOut = () => signOut(auth).then(() => { window.location.href = 'index.html'; });
+
+  onAuthStateChanged(auth, user => {
+    window._currentUser = user;
+    if (user) {
+      document.getElementById('auth-loading').style.display = 'none';
+      document.getElementById('app-main').style.display = 'block';
+      window._initSync(user.uid);
+    } else {
+      window.location.href = 'index.html';
+    }
+  });
+</script>
+
+<style>
+  :root {
+    --orange: #f97316;
+    --orange-light: #fff7ed;
+    --orange-border: #fed7aa;
+    --ink: #1c1917;
+    --soft: #57534e;
+    --muted: #a8a29e;
+    --line: #e7e5e4;
+    --bg: #fafaf9;
+    --card: #ffffff;
+    --green: #16a34a;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --violet: #7c3aed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* ── HEADER ── */
+  #header {
+    background: var(--orange);
+    color: white;
+    padding: 0 16px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(249,115,22,0.3);
+  }
+  #header h1 { font-size: 18px; font-weight: 800; }
+  #header .back-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  #header .back-btn:hover { background: rgba(255,255,255,0.3); }
+
+  /* ── STATS BAR ── */
+  #stats-bar {
+    background: white;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 16px;
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+  }
+  .stat-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+    min-width: 70px;
+  }
+  .stat-chip .val { font-size: 20px; font-weight: 800; color: var(--orange); }
+  .stat-chip .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ── FILTRES ── */
+  #filtres-bar {
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+  }
+  .filtre-btn {
+    border: 1.5px solid var(--line);
+    background: white;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+    color: var(--soft);
+    font-weight: 500;
+  }
+  .filtre-btn.active {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: white;
+  }
+
+  /* ── LISTE OBJETS ── */
+  #objets-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 100px;
+  }
+
+  .objet-card {
+    background: white;
+    border-radius: 14px;
+    border: 1.5px solid var(--line);
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: box-shadow .2s;
+  }
+  .objet-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+  .objet-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+
+  .objet-photo {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: var(--orange-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .objet-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+  .objet-infos { flex: 1; min-width: 0; }
+  .objet-nom { font-weight: 700; font-size: 15px; margin-bottom: 3px; }
+  .objet-desc { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .objet-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .objet-prix { font-weight: 800; font-size: 16px; color: var(--orange); }
+
+  /* ── STATUTS ── */
+  .statut-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .statut-fabrication { background: #fef9c3; color: #a16207; }
+  .statut-vente       { background: #dcfce7; color: #15803d; }
+  .statut-reserve     { background: #dbeafe; color: #1d4ed8; }
+  .statut-vendu       { background: #f3f4f6; color: #6b7280; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { padding: 0 14px 10px; }
+  .progress-bar {
+    height: 6px;
+    background: var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange), #fb923c);
+    border-radius: 3px;
+    transition: width .4s ease;
+  }
+  .progress-label { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  /* ── BOUTON AJOUTER ── */
+  #btn-add {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 28px;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(249,115,22,0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 50;
+    transition: transform .15s;
+  }
+  #btn-add:hover { transform: scale(1.04); }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 18px;
+    width: 100%;
+    max-width: 580px;
+    margin: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    overflow: hidden;
+  }
+  .modal-header {
+    background: var(--orange);
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h2 { font-size: 17px; font-weight: 800; }
+  .modal-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-body { padding: 20px; }
+
+  /* ── FORMULAIRE ── */
+  .form-group { margin-bottom: 14px; }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--soft);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 5px;
+  }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: white;
+    transition: border-color .15s;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--orange);
+  }
+  .form-textarea { resize: vertical; min-height: 70px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* ── ONGLETS DETAIL ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1.5px solid var(--line);
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2.5px solid transparent;
+    margin-bottom: -1.5px;
+    transition: all .15s;
+  }
+  .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+  .tab-content { display: none; padding: 16px; }
+  .tab-content.active { display: block; }
+
+  /* ── ÉTAPES ── */
+  .etape-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: background .1s;
+  }
+  .etape-item:hover { background: var(--orange-light); }
+  .etape-check {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--line);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all .15s;
+    font-size: 13px;
+  }
+  .etape-check.done { background: var(--orange); border-color: var(--orange); color: white; }
+  .etape-label { flex: 1; font-size: 14px; }
+  .etape-label.done { text-decoration: line-through; color: var(--muted); }
+
+  /* ── ÉTAPES CHOIX (lors de création) ── */
+  .etape-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    margin: 3px;
+    transition: all .15s;
+    user-select: none;
+    background: white;
+    color: var(--soft);
+  }
+  .etape-toggle.selected {
+    background: var(--orange-light);
+    border-color: var(--orange);
+    color: var(--orange);
+    font-weight: 600;
+  }
+
+  /* ── COURSES ── */
+  .magasin-section {
+    background: var(--orange-light);
+    border: 1.5px solid var(--orange-border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .magasin-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--orange);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .course-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: var(--soft);
+    border-bottom: 1px solid rgba(249,115,22,0.1);
+  }
+  .course-item:last-child { border-bottom: none; }
+  .course-item-origin { font-size: 11px; color: var(--muted); margin-left: auto; font-style: italic; }
+
+  /* ── ANNONCE ── */
+  .annonce-box {
+    background: var(--orange-light);
+    border: 1.5px solid var(--orange-border);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    white-space: pre-wrap;
+    font-family: inherit;
+  }
+  .btn-copy {
+    margin-top: 10px;
+    background: var(--orange);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* ── BOUTONS ── */
+  .btn-primary {
+    background: var(--orange);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity .15s;
+  }
+  .btn-primary:hover { opacity: .9; }
+  .btn-secondary {
+    background: var(--bg);
+    color: var(--soft);
+    border: 1.5px solid var(--line);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-danger {
+    background: #fee2e2;
+    color: var(--red);
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-small {
+    background: white;
+    border: 1.5px solid var(--line);
+    padding: 5px 10px;
+    border-radius: 7px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--soft);
+    font-weight: 600;
+  }
+  .btn-small:hover { border-color: var(--orange); color: var(--orange); }
+
+  /* ── PHOTO UPLOAD ── */
+  .photo-upload {
+    border: 2px dashed var(--orange-border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--orange-light);
+    transition: all .15s;
+  }
+  .photo-upload:hover { border-color: var(--orange); }
+  .photo-preview {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 10px;
+    margin-top: 10px;
+  }
+
+  /* ── LOADING ── */
+  #auth-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-size: 32px;
+  }
+  #app-main { display: none; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state .ico { font-size: 56px; margin-bottom: 16px; }
+  .empty-state p { font-size: 15px; }
+
+  /* ── DELETE CONFIRM ── */
+  .delete-confirm {
+    background: #fee2e2;
+    border: 1.5px solid #fca5a5;
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--red);
+  }
+</style>
+</head>
+<body>
+
+<div id="auth-loading">🪑</div>
+
+<div id="app-main">
+  <!-- Header -->
+  <div id="header">
+    <button class="back-btn" onclick="window.location.href='index.html'">← Accueil</button>
+    <h1>🪑 Le Bon Coin</h1>
+    <div style="width:80px;text-align:right;">
+      <button onclick="window._signOut()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;">⎋</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-bar">
+    <div class="stat-chip"><span class="val" id="stat-total">0</span><span class="lbl">Objets</span></div>
+    <div class="stat-chip"><span class="val" id="stat-fab" style="color:#a16207;">0</span><span class="lbl">Fabrication</span></div>
+    <div class="stat-chip"><span class="val" id="stat-vente" style="color:#15803d;">0</span><span class="lbl">En vente</span></div>
+    <div class="stat-chip"><span class="val" id="stat-vendu" style="color:#6b7280;">0</span><span class="lbl">Vendus</span></div>
+    <div class="stat-chip"><span class="val" id="stat-ca" style="color:var(--orange);">0€</span><span class="lbl">CA réalisé</span></div>
+  </div>
+
+  <!-- Filtres -->
+  <div id="filtres-bar">
+    <button class="filtre-btn active" onclick="setFiltre('tous')">Tous</button>
+    <button class="filtre-btn" onclick="setFiltre('fabrication')">🔨 Fabrication</button>
+    <button class="filtre-btn" onclick="setFiltre('vente')">🏷️ En vente</button>
+    <button class="filtre-btn" onclick="setFiltre('reserve')">📌 Réservé</button>
+    <button class="filtre-btn" onclick="setFiltre('vendu')">✅ Vendu</button>
+  </div>
+
+  <!-- Liste -->
+  <div id="objets-list"></div>
+
+  <!-- Bouton ajouter -->
+  <button id="btn-add" onclick="openModalAjout()">+ Nouvel objet</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL AJOUT / ÉDITION
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-ajout">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-ajout-titre">✨ Nouvel objet</h2>
+      <button class="modal-close" onclick="closeModalAjout()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Photo -->
+      <div class="form-group">
+        <label class="form-label">📷 Photo</label>
+        <div class="photo-upload" onclick="document.getElementById('photo-input').click()">
+          <div id="photo-placeholder">
+            <div style="font-size:32px;margin-bottom:6px;">📷</div>
+            <div style="font-size:13px;color:var(--muted);">Appuyer pour ajouter une photo</div>
+          </div>
+          <img id="photo-preview" class="photo-preview" style="display:none;" alt="aperçu">
+        </div>
+        <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoChange(event)">
+      </div>
+
+      <!-- Nom -->
+      <div class="form-group">
+        <label class="form-label">🪑 Nom de l'objet *</label>
+        <input type="text" class="form-input" id="f-nom" placeholder="ex: Commode années 70">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label class="form-label">📝 Description</label>
+        <textarea class="form-textarea" id="f-desc" placeholder="Matière, état, style, couleur…"></textarea>
+      </div>
+
+      <!-- Mesures -->
+      <div class="form-group">
+        <label class="form-label">📐 Mesures (cm)</label>
+        <div class="form-row-3">
+          <input type="number" class="form-input" id="f-L" placeholder="L">
+          <input type="number" class="form-input" id="f-l" placeholder="l">
+          <input type="number" class="form-input" id="f-H" placeholder="H">
+        </div>
+      </div>
+
+      <!-- Prix et statut -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">💰 Prix de vente (€)</label>
+          <input type="number" class="form-input" id="f-prix" placeholder="ex: 120">
+        </div>
+        <div class="form-group">
+          <label class="form-label">📌 Statut</label>
+          <select class="form-select" id="f-statut">
+            <option value="fabrication">🔨 En fabrication</option>
+            <option value="vente">🏷️ En vente</option>
+            <option value="reserve">📌 Réservé</option>
+            <option value="vendu">✅ Vendu</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Plateforme + date -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">📱 Plateforme</label>
+          <select class="form-select" id="f-plateforme">
+            <option value="leboncoin">Leboncoin</option>
+            <option value="vinted">Vinted</option>
+            <option value="les deux">Les deux</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">📅 Mise en ligne <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label>
+          <input type="date" class="form-input" id="f-date">
+        </div>
+      </div>
+
+      <!-- Étapes d'avancement à choisir -->
+      <div class="form-group">
+        <label class="form-label">📋 Étapes d'avancement</label>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">✅ = étape active &nbsp;|&nbsp; Clique pour activer/désactiver une étape selon l'objet</div>
+        <div id="etapes-choix-container"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:6px;">
+        <button class="btn-primary" onclick="saveObjet()">💾 Enregistrer</button>
+        <button class="btn-secondary" onclick="closeModalAjout()">Annuler</button>
+      </div>
+
+      <!-- Zone suppression (édition uniquement) -->
+      <div id="zone-supprimer" style="display:none;margin-top:16px;">
+        <button class="btn-danger" onclick="demanderSuppression()" style="width:100%;">🗑️ Supprimer cet objet</button>
+        <div id="confirm-supprimer" class="delete-confirm" style="display:none;">
+          Supprimer définitivement <strong id="confirm-nom"></strong> ?
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button onclick="confirmerSuppression()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;">Oui, supprimer</button>
+            <button onclick="document.getElementById('confirm-supprimer').style.display='none'" style="background:white;border:1.5px solid var(--line);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px;">Annuler</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL DÉTAIL OBJET
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="detail-titre">Détail</h2>
+      <div style="display:flex;gap:8px;">
+        <button onclick="editObjet()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✏️ Modifier</button>
+        <button onclick="demanderSuppressionDetail()" style="background:rgba(220,38,38,0.7);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">🗑️</button>
+        <button class="modal-close" onclick="closeModalDetail()">×</button>
+      </div>
+    </div>
+    <!-- Confirmation suppression -->
+    <div id="detail-confirm-suppr" style="display:none;background:#fee2e2;border-bottom:1px solid #fca5a5;padding:12px 16px;">
+      <div style="font-size:13px;color:#dc2626;font-weight:600;margin-bottom:8px;">Supprimer <span id="detail-confirm-nom"></span> ?</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="confirmerSuppressionDetail()" style="background:#dc2626;color:white;border:none;padding:6px 16px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;">Oui, supprimer</button>
+        <button onclick="document.getElementById('detail-confirm-suppr').style.display='none'" style="background:white;border:1.5px solid #e5e7eb;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px;">Annuler</button>
+      </div>
+    </div>
+
+    <!-- Onglets -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('infos')">ℹ️ Infos</button>
+      <button class="tab-btn" onclick="switchTab('etapes')">📋 Avancement</button>
+      <button class="tab-btn" onclick="switchTab('courses')">🛒 Achats</button>
+      <button class="tab-btn" onclick="switchTab('annonce')">📣 Annonce</button>
+    </div>
+
+    <!-- Onglet Infos -->
+    <div class="tab-content active" id="tab-infos">
+      <div id="detail-photo-wrap" style="margin-bottom:14px;"></div>
+      <div id="detail-infos-content"></div>
+    </div>
+
+    <!-- Onglet Avancement -->
+    <div class="tab-content" id="tab-etapes">
+      <div id="detail-etapes-content"></div>
+      <div style="margin-top:14px;background:var(--orange-light);border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Progression globale</div>
+        <div class="progress-bar"><div class="progress-fill" id="detail-progress-fill" style="width:0%"></div></div>
+        <div style="font-size:13px;font-weight:700;color:var(--orange);text-align:center;" id="detail-progress-pct">0%</div>
+      </div>
+    </div>
+
+    <!-- Onglet Courses -->
+    <div class="tab-content" id="tab-courses">
+      <div id="detail-courses-content"></div>
+
+      <!-- Ajouter article -->
+      <div style="margin-top:14px;background:var(--orange-light);border:1.5px dashed var(--orange-border);border-radius:12px;padding:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:10px;">+ Ajouter un article</div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <input type="text" class="form-input" id="course-article" placeholder="ex: Papier de verre grain 80">
+        </div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <div>
+            <label class="form-label" style="margin-bottom:4px;">Magasin</label>
+            <input type="text" class="form-input" id="course-magasin" placeholder="ex: Leroy Merlin" list="magasins-suggestions">
+            <datalist id="magasins-suggestions"></datalist>
+          </div>
+          <div>
+            <label class="form-label" style="margin-bottom:4px;">Quantité <span style="color:var(--muted);font-weight:400;">(opt.)</span></label>
+            <input type="text" class="form-input" id="course-qte" placeholder="ex: 2 rouleaux">
+          </div>
+        </div>
+        <button class="btn-primary" onclick="ajouterCourse()">+ Ajouter à la liste</button>
+      </div>
+
+      <div style="margin-top:12px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px;font-size:12px;color:#15803d;">
+        ✅ Les articles ajoutés ici apparaissent automatiquement dans le <strong>module Courses</strong> global
+      </div>
+    </div>
+
+    <!-- Onglet Annonce -->
+    <div class="tab-content" id="tab-annonce">
+      <div style="margin-bottom:12px;font-size:13px;color:var(--muted);">Annonce générée automatiquement depuis les infos de l'objet</div>
+      <div class="annonce-box" id="annonce-texte"></div>
+      <button class="btn-copy" onclick="copierAnnonce()">📋 Copier l'annonce</button>
+      <div style="margin-top:10px;">
+        <label class="form-label">Notes personnalisées à ajouter</label>
+        <textarea class="form-textarea" id="annonce-notes" placeholder="Infos supplémentaires, défauts, historique…" oninput="majAnnonce()"></textarea>
+      </div>
+      <div style="margin-top:10px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:10px;font-size:12px;color:#1d4ed8;">
+        💡 Copie l'annonce et colle-la directement sur Leboncoin ou Vinted
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════
+const TOUTES_ETAPES = [
+  { id: 'poncage',      label: '🪚 Ponçage' },
+  { id: 'peinture',     label: '🎨 Peinture' },
+  { id: 'reparation80', label: '🔧 Réparation 80%' },
+  { id: 'photo',        label: '📷 Photo' },
+  { id: 'redaction',    label: '📝 Rédaction annonce' },
+  { id: 'retouche100',  label: '✨ Retouches 100%' },
+  { id: 'en_ligne',     label: '🌐 Annonce mise en ligne' },
+  { id: 'livraison',    label: '🚚 Livraison' },
+];
+// Étapes qui déclenchent un changement de statut automatique
+const ETAPE_STATUT = {
+  redaction: 'vente',   // rédaction annonce → En vente
+  livraison: 'vendu',   // livraison → Vendu
+};
+
+// Photo LBC : stockées dans sous-collection pour éviter limite 1MB Firestore
+function photoLbcRef(uid, rid){
+  var fb=window._fb;
+  return fb.doc(fb.db,'users',uid,'photos_lbc',String(rid));
+}
+function _compressImageLbc(base64, callback){
+  var img=new Image();
+  img.onload=function(){
+    var TARGET=650000, ratio=img.height/img.width, maxSize=800;
+    var w=img.width>img.height?maxSize:Math.round(maxSize/ratio);
+    var h=Math.round(w*ratio);
+    var canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+    var result, quality=0.65, attempts=0;
+    do {
+      canvas.width=w; canvas.height=h;
+      ctx.clearRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      result=canvas.toDataURL('image/jpeg',quality);
+      if(result.length>TARGET){ w=Math.round(w*.8); h=Math.round(w*ratio); quality=Math.max(quality-.05,.2); }
+      attempts++;
+    } while(result.length>TARGET && attempts<8);
+    callback(result);
+  };
+  img.onerror=function(){ callback(base64); };
+  img.src=base64;
+}
+
+let objets = [];
+let filtreActif = 'tous';
+let currentObjetId = null;
+let editId = null;
+let photoData = null; // base64 (aperçu local)
+let _pendingPhotoId = null; // ID sous-collection Firebase
+
+function loadData() {
+  try { objets = JSON.parse(localStorage.getItem('leboncoinData') || '[]'); } catch(e) { objets = []; }
+}
+function saveData() {
+  localStorage.setItem('leboncoinData', JSON.stringify(objets));
+  syncToFirestore();
+  syncToGlobalCourses();
+}
+
+// ══════════════════════════════════════════════════════
+// FIREBASE SYNC
+// ══════════════════════════════════════════════════════
+window._initSync = function(uid) {
+  loadData();
+  render();
+  const { db, doc, onSnapshot, setDoc } = window._fb;
+  const ref = doc(db, 'users', uid, 'modules', 'leboncoin');
+  onSnapshot(ref, snap => {
+    if (snap.exists()) {
+      const remote = snap.data().objets || [];
+      const localMap = {};
+      objets.forEach(o => localMap[o.id] = o);
+      remote.forEach(o => {
+        if (!localMap[o.id] || (o.updatedAt || 0) > (localMap[o.id].updatedAt || 0)) {
+          // Récupérer photo depuis sous-collection si absente
+          if(!o.photo && o.photoId) {
+            getDoc(photoLbcRef(uid, o.photoId)).then(psnap => {
+              if(psnap.exists()) {
+                o.photo = psnap.data().data;
+                localMap[o.id] = o;
+                objets = Object.values(localMap);
+                localStorage.setItem('leboncoinData', JSON.stringify(objets));
+                render();
+              }
+            }).catch(()=>{});
+          }
+          localMap[o.id] = o;
+        }
+      });
+      objets = Object.values(localMap);
+      localStorage.setItem('leboncoinData', JSON.stringify(objets));
+      render();
+    }
+  });
+  window._syncToFirestore = async () => {
+    try {
+      // Exclure les photos base64 du document principal (limite 1MB)
+      // Les photos sont dans la sous-collection photos_lbc
+      var objetsLightweight = objets.map(function(o) {
+        var copy = Object.assign({}, o);
+        if(copy.photo && copy.photo.length > 10000) {
+          // Photo grande : uploader dans sous-collection si pas encore fait
+          if(!copy.photoId) {
+            var pid = 'p_' + copy.id;
+            copy.photoId = pid;
+            window._fb.setDoc(photoLbcRef(uid, pid), { data: copy.photo, type: 'image/jpeg' })
+              .catch(function(e){ console.warn('Upload photo LBC', e); });
+          }
+          delete copy.photo; // ne pas mettre le base64 dans le doc principal
+        }
+        return copy;
+      });
+      await setDoc(ref, { objets: objetsLightweight }, { merge: true });
+    } catch(e) { console.warn('Sync error', e); }
+  };
+};
+
+function syncToFirestore() {
+  if (window._syncToFirestore) window._syncToFirestore();
+}
+
+// ══════════════════════════════════════════════════════
+// SYNC AVEC MODULE COURSES GLOBAL
+// Écrit directement dans users/{uid} comme index.html
+// ══════════════════════════════════════════════════════
+async function syncToGlobalCourses() {
+  if (!window._fb || !window._currentUser) return;
+  try {
+    const { db, doc, getDoc, setDoc } = window._fb;
+    const uid = window._currentUser.uid;
+    const ref = doc(db, 'users', uid);
+
+    // Lire le coursesData actuel depuis Firebase
+    const snap = await getDoc(ref);
+    let coursesData = [];
+    if (snap.exists() && snap.data().coursesData) {
+      try { coursesData = JSON.parse(snap.data().coursesData); } catch(e) { coursesData = []; }
+    }
+
+    // Supprimer les anciens articles du Bon Coin
+    coursesData.forEach(mag => {
+      mag.items = (mag.items || []).filter(item => item._source !== 'leboncoin');
+    });
+
+    // Réinjecter les articles actuels de tous les objets
+    objets.forEach(objet => {
+      (objet.courses || []).forEach(course => {
+        if (!course.article) return;
+        const nomMag = course.magasin || 'Divers';
+        let mag = coursesData.find(m => m.name.toLowerCase() === nomMag.toLowerCase());
+        if (!mag) {
+          mag = { id: 'mag_lbc_' + Date.now() + '_' + Math.random(), name: nomMag, items: [] };
+          coursesData.push(mag);
+        }
+        const label = course.qte ? `${course.article} (${course.qte})` : course.article;
+        mag.items.push({
+          id: 'lbc_' + course.id,
+          text: label + ' — 🪑 ' + objet.nom,
+          checked: false,
+          separator: false,
+          _source: 'leboncoin',
+        });
+      });
+    });
+
+    // Nettoyer les magasins vides créés par leboncoin
+    coursesData = coursesData.filter(m => (m.items || []).length > 0 || !String(m.id).startsWith('mag_lbc_'));
+
+    // Écrire dans le même document Firebase que index.html
+    await setDoc(ref, { coursesData: JSON.stringify(coursesData) }, { merge: true });
+  } catch(e) { console.warn('Sync courses Firebase error', e); }
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER LISTE PRINCIPALE
+// ══════════════════════════════════════════════════════
+function render() {
+  updateStats();
+
+  const container = document.getElementById('objets-list');
+  let filtered = filtreActif === 'tous' ? objets : objets.filter(o => o.statut === filtreActif);
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="ico">🪑</div><p>${filtreActif === 'tous' ? 'Aucun objet pour l\'instant.<br>Clique sur + pour commencer !' : 'Aucun objet dans cette catégorie.'}</p></div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(o => {
+    const pct = calcProgress(o);
+    const statutHtml = statutBadge(o.statut);
+    const coutMatos = calcCoutMatos(o);
+    const marge = o.prix && coutMatos ? (parseFloat(o.prix) - coutMatos) : null;
+
+    return `<div class="objet-card" id="card-${o.id}">
+      <div class="objet-card-header" onclick="openDetail('${o.id}')">
+        <div class="objet-photo">
+          ${o.photo ? `<img src="${o.photo}" alt="${esc(o.nom)}">` : '🪑'}
+        </div>
+        <div class="objet-infos">
+          <div class="objet-nom">${esc(o.nom)}</div>
+          <div class="objet-desc">${esc(o.description || '—')}</div>
+          <div style="margin-top:5px;">${statutHtml}</div>
+        </div>
+        <div class="objet-right">
+          ${o.prix ? `<div class="objet-prix">${o.prix}€</div>` : ''}
+          ${marge !== null ? `<div style="font-size:11px;color:${marge >= 0 ? 'var(--green)' : 'var(--red)'};">${marge >= 0 ? '+' : ''}${marge.toFixed(0)}€</div>` : ''}
+          <div style="font-size:11px;color:var(--muted);">${o.plateforme || ''}</div>
+        </div>
+      </div>
+      ${pct > 0 ? `<div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-label"><span>${pct === 100 ? '🎉 Terminé !' : 'Avancement'}</span><span style="font-weight:700;color:var(--orange);">${pct}%</span></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = objets.length;
+  document.getElementById('stat-fab').textContent = objets.filter(o => o.statut === 'fabrication').length;
+  document.getElementById('stat-vente').textContent = objets.filter(o => o.statut === 'vente').length;
+  document.getElementById('stat-vendu').textContent = objets.filter(o => o.statut === 'vendu').length;
+  const ca = objets.filter(o => o.statut === 'vendu').reduce((s, o) => s + (parseFloat(o.prix) || 0), 0);
+  document.getElementById('stat-ca').textContent = ca + '€';
+}
+
+function setFiltre(f) {
+  filtreActif = f;
+  document.querySelectorAll('.filtre-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function calcProgress(o) {
+  const etapes = o.etapesChoisies || [];
+  if (etapes.length === 0) return 0;
+  const done = etapes.filter(e => o.etapesEtat && o.etapesEtat[e]).length;
+  return Math.round((done / etapes.length) * 100);
+}
+
+function calcCoutMatos(o) {
+  if (!o.courses || o.courses.length === 0) return null;
+  const withPrix = o.courses.filter(c => c.prix);
+  if (withPrix.length === 0) return null;
+  return withPrix.reduce((s, c) => s + (parseFloat(c.prix) || 0), 0);
+}
+
+function statutBadge(s) {
+  const map = {
+    fabrication: ['statut-fabrication', '🔨 Fabrication'],
+    vente:       ['statut-vente', '🏷️ En vente'],
+    reserve:     ['statut-reserve', '📌 Réservé'],
+    vendu:       ['statut-vendu', '✅ Vendu'],
+  };
+  const [cls, label] = map[s] || map.fabrication;
+  return `<span class="statut-badge ${cls}">${label}</span>`;
+}
+
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ══════════════════════════════════════════════════════
+// MODAL AJOUT / ÉDITION
+// ══════════════════════════════════════════════════════
+function openModalAjout() {
+  editId = null;
+  photoData = null;
+  document.getElementById('modal-ajout-titre').textContent = '✨ Nouvel objet';
+  document.getElementById('f-nom').value = '';
+  document.getElementById('f-desc').value = '';
+  document.getElementById('f-L').value = '';
+  document.getElementById('f-l').value = '';
+  document.getElementById('f-H').value = '';
+  document.getElementById('f-prix').value = '';
+  document.getElementById('f-statut').value = 'fabrication';
+  document.getElementById('f-plateforme').value = 'leboncoin';
+  document.getElementById('f-date').value = '';
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-placeholder').style.display = '';
+  document.getElementById('zone-supprimer').style.display = 'none';
+  document.getElementById('confirm-supprimer').style.display = 'none';
+  renderEtapesChoix(TOUTES_ETAPES.map(e => e.id)); // tout sélectionné par défaut
+  document.getElementById('modal-ajout').classList.add('open');
+}
+
+function openModalAjoutVide() {
+  openModalAjout();
+  // rien de sélectionné par défaut
+  renderEtapesChoix([]);
+}
+
+function closeModalAjout() {
+  document.getElementById('modal-ajout').classList.remove('open');
+}
+
+function editObjet() {
+  const o = objets.find(x => x.id === currentObjetId); // récupérer AVANT de fermer
+  if (!o) return;
+  closeModalDetail();
+  editId = o.id;
+  photoData = o.photo || null;
+  document.getElementById('modal-ajout-titre').textContent = '✏️ Modifier';
+  document.getElementById('f-nom').value = o.nom || '';
+  document.getElementById('f-desc').value = o.description || '';
+  const m = o.mesures || {};
+  document.getElementById('f-L').value = m.L || '';
+  document.getElementById('f-l').value = m.l || '';
+  document.getElementById('f-H').value = m.H || '';
+  document.getElementById('f-prix').value = o.prix || '';
+  document.getElementById('f-statut').value = o.statut || 'fabrication';
+  document.getElementById('f-plateforme').value = o.plateforme || 'leboncoin';
+  document.getElementById('f-date').value = o.dateMiseEnLigne || '';
+  if (o.photo) {
+    document.getElementById('photo-preview').src = o.photo;
+    document.getElementById('photo-preview').style.display = '';
+    document.getElementById('photo-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-placeholder').style.display = '';
+  }
+  document.getElementById('zone-supprimer').style.display = '';
+  document.getElementById('confirm-nom').textContent = o.nom;
+  document.getElementById('confirm-supprimer').style.display = 'none';
+  renderEtapesChoix(o.etapesChoisies || TOUTES_ETAPES.map(e => e.id));
+  document.getElementById('modal-ajout').classList.add('open');
+}
+
+function renderEtapesChoix(selected) {
+  const container = document.getElementById('etapes-choix-container');
+  container.innerHTML = TOUTES_ETAPES.map(e => {
+    const sel = selected.includes(e.id);
+    return `<span class="etape-toggle ${sel ? 'selected' : ''}" data-etapeid="${e.id}" onclick="toggleEtapeChoix('${e.id}', this)" title="${sel ? 'Étape active - clique pour désactiver' : 'Clique pour activer'}">${sel ? '✓ ' : ''}${e.label}</span>`;
+  }).join('');
+}
+
+function toggleEtapeChoix(id, el) {
+  el.classList.toggle('selected');
+  // MAJ du checkmark visuel
+  const etape = TOUTES_ETAPES.find(e => e.id === id);
+  if (etape) {
+    el.textContent = (el.classList.contains('selected') ? '✓ ' : '') + etape.label;
+  }
+}
+
+
+
+function getEtapesChoisies() {
+  return [...document.querySelectorAll('#etapes-choix-container .etape-toggle.selected')]
+    .map(el => el.dataset.etapeid)
+    .filter(Boolean);
+}
+
+function handlePhotoChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    // Compresser l'image
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 800;
+      const ratio = Math.min(maxW / img.width, maxW / img.height, 1);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      photoData = canvas.toDataURL('image/jpeg', 0.75);
+      document.getElementById('photo-preview').src = photoData;
+      document.getElementById('photo-preview').style.display = '';
+      document.getElementById('photo-placeholder').style.display = 'none';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveObjet() {
+  const nom = document.getElementById('f-nom').value.trim();
+  if (!nom) { alert('Le nom est obligatoire !'); return; }
+
+  const etapesChoisies = getEtapesChoisies();
+  const data = {
+    nom,
+    description: document.getElementById('f-desc').value.trim(),
+    mesures: {
+      L: document.getElementById('f-L').value,
+      l: document.getElementById('f-l').value,
+      H: document.getElementById('f-H').value,
+    },
+    prix: document.getElementById('f-prix').value,
+    statut: document.getElementById('f-statut').value,
+    plateforme: document.getElementById('f-plateforme').value,
+    dateMiseEnLigne: document.getElementById('f-date').value,
+    photo: photoData,
+    etapesChoisies,
+    updatedAt: Date.now(),
+  };
+
+  if (editId) {
+    const idx = objets.findIndex(o => o.id === editId);
+    if (idx !== -1) {
+      objets[idx] = { ...objets[idx], ...data };
+    }
+  } else {
+    objets.push({
+      id: 'lbc_' + Date.now(),
+      ...data,
+      etapesEtat: {},
+      courses: [],
+      annonceNotes: '',
+      createdAt: Date.now(),
+    });
+  }
+
+  saveData();
+  render();
+  closeModalAjout();
+}
+
+function demanderSuppression() {
+  document.getElementById('confirm-supprimer').style.display = '';
+}
+
+function confirmerSuppression() {
+  if (!editId) return;
+  objets = objets.filter(o => o.id !== editId);
+  saveData();
+  render();
+  closeModalAjout();
+}
+
+// ══════════════════════════════════════════════════════
+// MODAL DÉTAIL
+// ══════════════════════════════════════════════════════
+function openDetail(id) {
+  currentObjetId = id;
+  const o = objets.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('detail-titre').textContent = '🪑 ' + o.nom;
+  switchTab('infos');
+  renderDetailInfos(o);
+  renderDetailEtapes(o);
+  renderDetailCourses(o);
+  majAnnonce();
+  document.getElementById('modal-detail').classList.add('open');
+}
+
+function closeModalDetail() {
+  document.getElementById('modal-detail').classList.remove('open');
+  document.getElementById('detail-confirm-suppr').style.display = 'none';
+  currentObjetId = null;
+}
+
+function demanderSuppressionDetail() {
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+  document.getElementById('detail-confirm-nom').textContent = '"' + o.nom + '"';
+  document.getElementById('detail-confirm-suppr').style.display = '';
+}
+
+function confirmerSuppressionDetail() {
+  if (!currentObjetId) return;
+  objets = objets.filter(o => o.id !== currentObjetId);
+  saveData();
+  render();
+  closeModalDetail();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const tabs = ['infos', 'etapes', 'courses', 'annonce'];
+    b.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'annonce') majAnnonce();
+}
+
+function renderDetailInfos(o) {
+  const m = o.mesures || {};
+  const mesures = [m.L, m.l, m.H].some(v => v) ? `${m.L || '?'} × ${m.l || '?'} × ${m.H || '?'} cm` : '—';
+  const coutMatos = calcCoutMatos(o);
+  const marge = o.prix && coutMatos !== null ? (parseFloat(o.prix) - coutMatos) : null;
+
+  document.getElementById('detail-photo-wrap').innerHTML = o.photo
+    ? `<img src="${o.photo}" style="width:100%;max-height:220px;object-fit:contain;border-radius:12px;background:#f5f5f5;">` : '';
+
+  document.getElementById('detail-infos-content').innerHTML = `
+    <div style="display:grid;gap:10px;">
+      ${o.description ? `<div style="background:var(--orange-light);border-radius:10px;padding:12px;font-size:14px;line-height:1.6;">${esc(o.description)}</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:var(--bg);border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">MESURES</div>
+          <div style="font-weight:700;">${mesures}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">PLATEFORME</div>
+          <div style="font-weight:700;">${o.plateforme || '—'}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">PRIX VENTE</div>
+          <div style="font-weight:700;color:var(--orange);">${o.prix ? o.prix + ' €' : '—'}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">COÛT MATOS</div>
+          <div style="font-weight:700;">${coutMatos !== null ? coutMatos.toFixed(0) + ' €' : '—'}</div>
+        </div>
+        ${marge !== null ? `<div style="background:${marge >= 0 ? '#f0fdf4' : '#fef2f2'};border-radius:8px;padding:10px;grid-column:span 2;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">MARGE ESTIMÉE</div>
+          <div style="font-weight:800;font-size:18px;color:${marge >= 0 ? 'var(--green)' : 'var(--red)'};">${marge >= 0 ? '+' : ''}${marge.toFixed(0)} €</div>
+        </div>` : ''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        ${statutBadge(o.statut)}
+        ${o.dateMiseEnLigne ? `<span style="font-size:12px;color:var(--muted);">En ligne : ${o.dateMiseEnLigne}</span>` : ''}
+      </div>
+      <!-- Changer statut rapide -->
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Changer le statut :</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${['fabrication','vente','reserve','vendu'].map(s => `
+            <button onclick="changerStatut('${s}')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--line);background:${o.statut===s?'var(--orange)':'white'};color:${o.statut===s?'white':'var(--soft)'};cursor:pointer;font-size:12px;font-weight:600;">${statutLabel(s)}</button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function statutLabel(s) {
+  return { fabrication: '🔨', vente: '🏷️ En vente', reserve: '📌 Réservé', vendu: '✅ Vendu' }[s] || s;
+}
+
+function changerStatut(s) {
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+  o.statut = s;
+  o.updatedAt = Date.now();
+  saveData();
+  render();
+  renderDetailInfos(o);
+}
+
+function renderDetailEtapes(o) {
+  const etapes = (o.etapesChoisies || []).map(id => TOUTES_ETAPES.find(e => e.id === id)).filter(Boolean);
+  const pct = calcProgress(o);
+
+  document.getElementById('detail-etapes-content').innerHTML = etapes.length === 0
+    ? '<p style="text-align:center;color:var(--muted);padding:20px;">Aucune étape sélectionnée pour cet objet</p>'
+    : etapes.map(e => {
+        const done = o.etapesEtat && o.etapesEtat[e.id];
+        return `<div class="etape-item">
+          <div class="etape-check ${done ? 'done' : ''}" onclick="toggleEtape('${e.id}')">${done ? '✓' : ''}</div>
+          <div class="etape-label ${done ? 'done' : ''}">${e.label}</div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('detail-progress-fill').style.width = pct + '%';
+  document.getElementById('detail-progress-pct').textContent = pct === 100 ? '🎉 100% — Terminé !' : pct + '%';
+}
+
+function toggleEtape(etapeId) {
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+  if (!o.etapesEtat) o.etapesEtat = {};
+  o.etapesEtat[etapeId] = !o.etapesEtat[etapeId];
+
+  // Changement de statut automatique
+  if (o.etapesEtat[etapeId] && ETAPE_STATUT[etapeId]) {
+    o.statut = ETAPE_STATUT[etapeId];
+  }
+
+  o.updatedAt = Date.now();
+  saveData();
+  render();
+  renderDetailEtapes(o);
+  // Rafraîchir les infos si l'onglet infos est visible
+  const infoTab = document.getElementById('tab-infos');
+  if (infoTab && infoTab.classList.contains('active')) renderDetailInfos(o);
+}
+
+// ══════════════════════════════════════════════════════
+// COURSES
+// ══════════════════════════════════════════════════════
+function renderDetailCourses(o) {
+  const courses = o.courses || [];
+
+  // Suggestions de magasins depuis module courses global
+  try {
+    const coursesData = JSON.parse(localStorage.getItem('coursesData') || '[]');
+    const dl = document.getElementById('magasins-suggestions');
+    if (dl) dl.innerHTML = coursesData.map(m => `<option value="${esc(m.name)}">`).join('');
+  } catch(e) {}
+
+  if (courses.length === 0) {
+    document.getElementById('detail-courses-content').innerHTML =
+      '<p style="text-align:center;color:var(--muted);padding:16px 0;font-size:13px;">Aucun article pour l\'instant</p>';
+    return;
+  }
+
+  // Grouper par magasin
+  const grouped = {};
+  courses.forEach(c => {
+    const mag = c.magasin || 'Divers';
+    if (!grouped[mag]) grouped[mag] = [];
+    grouped[mag].push(c);
+  });
+
+  document.getElementById('detail-courses-content').innerHTML = Object.entries(grouped).map(([mag, items]) => `
+    <div class="magasin-section">
+      <div class="magasin-title">
+        🛒 ${esc(mag)}
+        <span style="font-size:11px;color:var(--muted);">${items.length} article${items.length>1?'s':''}</span>
+      </div>
+      ${items.map(c => `
+        <div class="course-item">
+          <span style="flex:1;">${esc(c.article)}${c.qte ? ' <span style="color:var(--muted);">× '+esc(c.qte)+'</span>' : ''}${c.prix ? ' <span style="color:var(--green);font-weight:600;">— '+c.prix+'€</span>' : ''}</span>
+          <button onclick="supprimerCourse('${c.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;">×</button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function ajouterCourse() {
+  const article = document.getElementById('course-article').value.trim();
+  const magasin = document.getElementById('course-magasin').value.trim();
+  const qte = document.getElementById('course-qte').value.trim();
+  if (!article) { alert('Écris l\'article !'); return; }
+
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+  if (!o.courses) o.courses = [];
+  o.courses.push({
+    id: 'c_' + Date.now(),
+    article,
+    magasin: magasin || 'Divers',
+    qte,
+    prix: '',
+  });
+  o.updatedAt = Date.now();
+  saveData();
+  document.getElementById('course-article').value = '';
+  document.getElementById('course-qte').value = '';
+  renderDetailCourses(o);
+}
+
+function supprimerCourse(cid) {
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+  o.courses = (o.courses || []).filter(c => c.id !== cid);
+  o.updatedAt = Date.now();
+  saveData();
+  renderDetailCourses(o);
+}
+
+// ══════════════════════════════════════════════════════
+// GÉNÉRATION ANNONCE
+// ══════════════════════════════════════════════════════
+function majAnnonce() {
+  const o = objets.find(x => x.id === currentObjetId);
+  if (!o) return;
+
+  let notes = document.getElementById('annonce-notes')?.value || o.annonceNotes || '';
+  // Nettoyer les anciennes phrases supprimées si elles trainent dans les notes
+  notes = notes.replace(/📱 Annonce également sur [^\n]*/g, '').trim();
+  if (o) o.annonceNotes = notes;
+
+  const m = o.mesures || {};
+  const mesures = [m.L, m.l, m.H].some(v => v) ? `\nDimensions : L ${m.L||'?'} × l ${m.l||'?'} × H ${m.H||'?'} cm` : '';
+  const prix = o.prix ? `\n💶 Prix : ${o.prix} €` : '';
+
+  const titreAnnonce = o.nom;
+  let texte = '';
+
+  if (o.plateforme === 'vinted') {
+    // Style Vinted : court et direct
+    texte = `${titreAnnonce}\n\n${o.description || ''}${mesures}${prix}\n\n✨ Pièce unique retapée à la main\n📦 Envoi possible`;
+  } else {
+    // Style Leboncoin : plus détaillé
+    texte = `${titreAnnonce}\n${'─'.repeat(30)}\n\n${o.description || ''}${mesures}${prix}\n\n✨ Pièce unique, restaurée avec soin\n🚚 Livraison possible près de Paris\n📦 Remise en main propre possible\n\nN'hésitez pas à me contacter pour plus d'infos ou des photos supplémentaires !`;
+  }
+
+  if (notes) texte += `\n\n─────\n${notes}`;
+
+  const el = document.getElementById('annonce-texte');
+  if (el) el.textContent = texte;
+  if (document.getElementById('annonce-notes')) {
+    document.getElementById('annonce-notes').value = notes;
+  }
+}
+
+function copierAnnonce() {
+  const texte = document.getElementById('annonce-texte')?.textContent || '';
+  navigator.clipboard.writeText(texte).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copié !';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+loadData();
+// L'affichage se déclenchera après onAuthStateChanged → _initSync
+</script>
+</body>
+</html>
