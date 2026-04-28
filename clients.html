@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌿🔧 Clients</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16a34a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clients">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, deleteDoc as _fbDeleteDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCnv0S78A8kK9vHHrzQKfYbX6NWM1UXRhs",
+    authDomain: "mon-planificateur-1e03c.firebaseapp.com",
+    projectId: "mon-planificateur-1e03c",
+    storageBucket: "mon-planificateur-1e03c.firebasestorage.app",
+    messagingSenderId: "978579425049",
+    appId: "1:978579425049:web:e53559ba2b80517c7c6788"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  window._fb = { auth, db, doc, setDoc, getDoc, onSnapshot, collection, deleteDoc: _fbDeleteDoc, signOut };
+  window._signOut = () => signOut(auth).then(() => { window.location.href = 'index.html'; });
+
+  onAuthStateChanged(auth, user => {
+    window._currentUser = user;
+    if (user) {
+      document.getElementById('auth-loading').style.display = 'none';
+      document.getElementById('app-main').style.display = 'block';
+      window._initSync(user.uid);
+    } else {
+      window.location.href = 'index.html';
+    }
+  });
+</script>
+
+<style>
+:root {
+  --green:#16a34a; --green-light:#f0fdf4; --green-border:#86efac;
+  --blue:#2563eb; --blue-light:#eff6ff;
+  --ink:#1c1917; --soft:#57534e; --muted:#a8a29e; --line:#e7e5e4;
+  --bg:#fafaf9; --card:#fff; --red:#dc2626; --orange:#f97316; --amber:#d97706;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;}
+#header{background:var(--green);color:white;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(22,163,74,.3);}
+#header h1{font-size:18px;font-weight:800;}
+.back-btn{background:rgba(255,255,255,.2);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;}
+#main-tabs{display:flex;background:white;border-bottom:2px solid var(--line);position:sticky;top:56px;z-index:90;}
+.main-tab{flex:1;padding:12px 4px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;}
+.main-tab.active{color:var(--green);border-bottom-color:var(--green);}
+.section{display:none;padding:14px 16px;padding-bottom:100px;}
+.section.active{display:block;}
+.client-card{background:white;border-radius:14px;border:1.5px solid var(--line);margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .2s;}
+.client-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.client-card-header{display:flex;align-items:center;gap:12px;padding:14px;}
+.client-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--green),#4ade80);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;flex-shrink:0;}
+.client-infos{flex:1;min-width:0;}
+.client-nom{font-weight:700;font-size:15px;}
+.client-detail{font-size:12px;color:var(--muted);margin-top:2px;}
+.chantier-card{background:var(--green-light);border:1.5px solid var(--green-border);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.chantier-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;}
+.chantier-nom{font-weight:700;font-size:14px;color:var(--green);}
+.matos-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(22,163,74,.1);}
+.matos-item:last-child{border-bottom:none;}
+.matos-check{width:22px;height:22px;border:2px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:13px;}
+.matos-check.done{background:var(--green);border-color:var(--green);color:white;}
+.matos-label{flex:1;font-size:14px;}
+.matos-label.done{text-decoration:line-through;color:var(--muted);}
+.arrosage-card{background:white;border:1.5px solid #bfdbfe;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.arrosage-alert{background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;}
+.arrosage-alert.urgent{background:#fee2e2;color:#dc2626;}
+.arrosage-alert.done{background:#dcfce7;color:#15803d;}
+.devis-block{background:white;border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;}
+.devis-preview{background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;font-family:inherit;color:var(--ink);}
+.debours-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.debours-item:last-child{border-bottom:none;}
+#btn-add{position:fixed;bottom:24px;right:20px;background:var(--green);color:white;border:none;border-radius:28px;padding:14px 22px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(22,163,74,.4);display:flex;align-items:center;gap:8px;z-index:50;transition:transform .15s;}
+#btn-add:hover{transform:scale(1.04);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;}
+.modal-overlay.open{display:flex;}
+.modal{background:white;border-radius:18px;width:100%;max-width:580px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+.modal-header{color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+.modal-header.green{background:var(--green);}
+.modal-header h2{font-size:17px;font-weight:800;}
+.modal-close{background:rgba(255,255,255,.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-body{padding:20px;}
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;}
+.form-input,.form-select,.form-textarea{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;color:var(--ink);background:white;transition:border-color .15s;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--green);}
+.form-textarea{resize:vertical;min-height:70px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sub-tabs{display:flex;border-bottom:1.5px solid var(--line);overflow-x:auto;background:white;}
+.sub-tab{padding:9px 14px;border:none;background:none;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;transition:all .15s;}
+.sub-tab.active{color:var(--green);border-bottom-color:var(--green);}
+.sub-content{display:none;padding:14px;}
+.sub-content.active{display:block;}
+.progress-bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--green),#4ade80);border-radius:4px;transition:width .4s ease;}
+.btn-primary{background:var(--green);color:white;border:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-secondary{background:var(--bg);color:var(--soft);border:1.5px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-danger{background:#fee2e2;color:var(--red);border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-small{background:white;border:1.5px solid var(--line);padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;color:var(--soft);font-weight:600;}
+.btn-small:hover{border-color:var(--green);color:var(--green);}
+.btn-icon{background:none;border:none;cursor:pointer;font-size:16px;padding:4px;color:var(--muted);}
+.magasin-section{background:var(--green-light);border:1.5px solid var(--green-border);border-radius:12px;padding:12px;margin-bottom:10px;}
+.magasin-title{font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.course-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(22,163,74,.1);}
+.course-row:last-child{border-bottom:none;}
+.taux-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);}
+.taux-item:last-child{border-bottom:none;}
+.pill{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;}
+.pill-green{background:var(--green-light);color:var(--green);}
+.pill-blue{background:var(--blue-light);color:var(--blue);}
+.recu-chip{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12px;margin:3px;}
+.recu-chip.uploading{opacity:.6;}
+#auth-loading{display:flex;align-items:center;justify-content:center;height:100vh;font-size:40px;}
+#app-main{display:none;}
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty-state .ico{font-size:48px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div id="auth-loading">🌿</div>
+<div id="app-main">
+  <div id="header">
+    <button class="back-btn" onclick="window.location.href='index.html'">← Accueil</button>
+    <h1>🌿🔧 Clients</h1>
+    <button onclick="window._signOut()" style="background:rgba(255,255,255,.2);border:none;color:white;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;">⎋</button>
+  </div>
+  <div id="main-tabs">
+    <button class="main-tab active" onclick="switchMain('clients')">👥 Clients</button>
+    <button class="main-tab" onclick="switchMain('arrosage')">💧 Arrosage</button>
+    <button class="main-tab" onclick="switchMain('matos-stock')">🧰 Stock</button>
+    <button class="main-tab" onclick="switchMain('config')">⚙️ Config</button>
+  </div>
+  <div class="section active" id="section-clients"><div id="clients-list"></div></div>
+  <div class="section" id="section-arrosage">
+    <div style="background:#dbeafe;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#1d4ed8;">💧 Toutes les plantes en attente de plantation</div>
+    <div id="arrosage-list"></div>
+  </div>
+  <div class="section" id="section-matos-stock">
+    <div style="background:var(--green-light);border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--green);">🧰 Ton stock complet — tu piocheras dedans pour chaque chantier</div>
+    <div id="matos-stock-list"></div>
+    <button class="btn-primary" style="width:100%;margin-top:10px;" onclick="openModalMatosStock()">+ Ajouter du matériel</button>
+  </div>
+  <div class="section" id="section-config">
+    <div style="background:white;border-radius:14px;border:1.5px solid var(--line);padding:16px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px;">💶 Taux horaires</div>
+      <div id="taux-list"></div>
+      <button class="btn-small" style="margin-top:10px;width:100%;" onclick="openModalTaux()">+ Ajouter un taux</button>
+    </div>
+    <div style="background:white;border-radius:14px;border:1.5px solid var(--line);padding:16px;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px;">📋 Profil pour les devis</div>
+      <div class="form-group"><label class="form-label">Nom / raison sociale</label><input type="text" class="form-input" id="config-nom" placeholder="ex: Marie Dupont" oninput="saveConfig()"></div>
+      <div class="form-group"><label class="form-label">SIRET</label><input type="text" class="form-input" id="config-siret" placeholder="ex: 123 456 789 00012" oninput="saveConfig()"></div>
+      <div class="form-group"><label class="form-label">Téléphone</label><input type="tel" class="form-input" id="config-tel" placeholder="ex: 06 12 34 56 78" oninput="saveConfig()"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="config-email" oninput="saveConfig()"></div>
+      <div class="form-group"><label class="form-label">Mention légale</label><textarea class="form-textarea" id="config-mention" placeholder="ex: TVA non applicable, art. 293B du CGI." oninput="saveConfig()" rows="2"></textarea></div>
+    </div>
+  </div>
+  <button id="btn-add" onclick="openModalClient()">+ Nouveau client</button>
+</div>
+
+<!-- MODAL CLIENT -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <div class="modal-header green"><h2 id="modal-client-titre">👤 Nouveau client</h2><button class="modal-close" onclick="closeModal('modal-client')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nom *</label><input type="text" class="form-input" id="fc-nom" placeholder="ex: Famille Martin"></div>
+      <div class="form-group"><label class="form-label">Adresse <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label><input type="text" class="form-input" id="fc-adresse"></div>
+      <div class="form-group"><label class="form-label">Téléphone <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label><input type="tel" class="form-input" id="fc-tel"></div>
+      <div class="form-group"><label class="form-label">Notes <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label><textarea class="form-textarea" id="fc-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1;" onclick="saveClient()">💾 Enregistrer</button>
+        <button class="btn-secondary" onclick="closeModal('modal-client')">Annuler</button>
+      </div>
+      <div id="fc-suppr-zone" style="display:none;margin-top:14px;">
+        <button class="btn-danger" style="width:100%;" onclick="document.getElementById('fc-suppr-confirm').style.display=''">🗑️ Supprimer ce client</button>
+        <div id="fc-suppr-confirm" style="display:none;margin-top:8px;background:#fee2e2;border-radius:8px;padding:10px;">
+          <div style="font-size:13px;color:var(--red);margin-bottom:8px;">Supprimer ce client et tous ses chantiers ?</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="confirmerSuppClient()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;">Oui</button>
+            <button onclick="document.getElementById('fc-suppr-confirm').style.display='none'" class="btn-secondary" style="padding:6px 12px;">Non</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL CLIENT -->
+<div class="modal-overlay" id="modal-detail-client">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header green">
+      <h2 id="detail-client-titre">Client</h2>
+      <div style="display:flex;gap:8px;">
+        <button onclick="editClient()" style="background:rgba(255,255,255,.2);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✏️</button>
+        <button class="modal-close" onclick="closeModal('modal-detail-client')">×</button>
+      </div>
+    </div>
+    <div id="detail-client-infos" style="padding:12px 16px;background:var(--green-light);border-bottom:1px solid var(--green-border);font-size:13px;color:var(--soft);"></div>
+    <div style="padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:15px;">🏗️ Chantiers</div>
+        <button class="btn-small" onclick="openModalChantier(null)">+ Nouveau chantier</button>
+      </div>
+      <div id="chantiers-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CHANTIER -->
+<div class="modal-overlay" id="modal-chantier">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header green">
+      <h2 id="modal-chantier-titre">🏗️ Chantier</h2>
+      <div style="display:flex;gap:8px;">
+        <button id="btn-suppr-chantier" onclick="demanderSuppChantier()" style="background:rgba(220,38,38,.6);border:none;color:white;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:none;">🗑️</button>
+        <button class="modal-close" onclick="closeModal('modal-chantier')">×</button>
+      </div>
+    </div>
+    <div id="chantier-suppr-confirm" style="display:none;background:#fee2e2;padding:10px 16px;border-bottom:1px solid #fca5a5;">
+      <div style="font-size:13px;color:var(--red);font-weight:600;margin-bottom:6px;">Supprimer ce chantier ?</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="confirmerSuppChantier()" style="background:var(--red);color:white;border:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;">Oui</button>
+        <button onclick="document.getElementById('chantier-suppr-confirm').style.display='none'" class="btn-secondary" style="padding:5px 12px;font-size:13px;">Non</button>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-end;background:var(--green-light);">
+      <div style="flex:1;"><label class="form-label">Nom du chantier</label><input type="text" class="form-input" id="fch-nom" placeholder="ex: Taille haie + plantation rosiers" oninput="autoSaveChantierNom()"></div>
+      <div><label class="form-label">Type</label><select class="form-select" id="fch-type" style="width:130px;" onchange="autoSaveChantierNom()"><option value="jardinage">🌿 Jardinage</option><option value="bricolage">🔧 Bricolage</option><option value="mixte">🌿🔧 Mixte</option></select></div>
+    </div>
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="switchSub('matos')">🧰 Matos</button>
+      <button class="sub-tab" onclick="switchSub('courses')">🛒 Achats</button>
+      <button class="sub-tab" onclick="switchSub('devis')">📋 Devis</button>
+      <button class="sub-tab" onclick="switchSub('debours')">💸 Débours</button>
+      <button class="sub-tab" onclick="switchSub('arrosage-ch')">💧 Arrosage</button>
+    </div>
+
+    <!-- MATOS -->
+    <div class="sub-content active" id="sub-matos">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Ajoute le matériel depuis ton stock ou à la volée</div>
+      <div id="chantier-matos-list"></div>
+      <!-- Bouton choisir dans le stock -->
+      <button class="btn-small" style="width:100%;margin-top:10px;border-color:var(--green);color:var(--green);" onclick="toggleStockPanel()">🧰 Choisir dans mon stock</button>
+      <div id="stock-panel" style="display:none;background:var(--green-light);border:1.5px solid var(--green-border);border-radius:12px;padding:12px;margin-top:8px;">
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px;">Clique pour ajouter au chantier :</div>
+        <div id="stock-panel-list"></div>
+      </div>
+      <!-- Ou ajouter à la volée -->
+      <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Ou ajouter un item à la volée :</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <div style="flex:1;"><input type="text" class="form-input" id="matos-article" placeholder="Nom du matériel"></div>
+          <div style="width:70px;"><input type="text" class="form-input" id="matos-qte" placeholder="Qté"></div>
+          <button class="btn-primary" onclick="ajouterMatos()" style="padding:10px 16px;white-space:nowrap;">+</button>
+        </div>
+      </div>
+      <div class="progress-bar" style="margin-top:12px;"><div class="progress-fill" id="matos-progress-fill" style="width:0%"></div></div>
+      <div style="text-align:center;font-size:12px;color:var(--green);font-weight:700;" id="matos-progress-pct">0%</div>
+      <!-- Alims à charger -->
+      <div id="alims-charger-section"></div>
+      <button onclick="openModalAjoutAlim()" style="width:100%;margin-top:10px;background:#fef9c3;border:1.5px solid #fcd34d;color:#b45309;padding:8px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">🔌 Gérer les alims à charger</button>
+    </div>
+
+    <!-- COURSES -->
+    <div class="sub-content" id="sub-courses">
+      <div id="chantier-courses-list"></div>
+      <div style="margin-top:12px;background:var(--green-light);border:1.5px dashed var(--green-border);border-radius:12px;padding:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:8px;">+ Ajouter un article</div>
+        <div class="form-group" style="margin-bottom:8px;"><input type="text" class="form-input" id="course-article" placeholder="Article (ex: plante Rosier, terreau…)"></div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <input type="text" class="form-input" id="course-magasin" placeholder="Magasin" list="magasins-sugg">
+          <datalist id="magasins-sugg"></datalist>
+          <input type="text" class="form-input" id="course-qte" placeholder="Quantité (optionnel)">
+        </div>
+        <button class="btn-primary" style="width:100%;" onclick="ajouterCourse()">+ Ajouter</button>
+      </div>
+      <div style="margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:8px;font-size:12px;color:#15803d;">
+        ✅ Synchro avec le module Courses global &nbsp;·&nbsp; 💡 Écris <strong>"plante [nom]"</strong> pour qu'elle apparaisse aussi dans Arrosage
+      </div>
+    </div>
+
+    <!-- DEVIS -->
+    <div class="sub-content" id="sub-devis"><div id="devis-content"></div></div>
+
+    <!-- DÉBOURS -->
+    <div class="sub-content" id="sub-debours">
+      <div id="debours-list"></div>
+      <button onclick="exportDeboursPDF()" style="width:100%;margin-bottom:12px;background:#f97316;color:white;border:none;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">📥 Générer note de débours PDF</button>
+      <!-- input fichier caché -->
+      <input type="file" id="debours-file-input" accept=".pdf,image/*" capture="environment" style="display:none;" onchange="addDeboursFile(this)">
+      <div style="margin-top:12px;background:var(--green-light);border:1.5px dashed var(--green-border);border-radius:12px;padding:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:8px;">+ Ajouter une dépense</div>
+        <div class="form-group" style="margin-bottom:8px;"><input type="text" class="form-input" id="deb-desc" placeholder="Description (ex: plants tomates)"></div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <input type="number" class="form-input" id="deb-montant" placeholder="Montant €">
+          <input type="date" class="form-input" id="deb-date">
+        </div>
+        <div style="margin-bottom:8px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:10px;">
+          <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">📎 Joindre un justificatif (optionnel)</div>
+          <div id="debours-recu-preview" style="margin-bottom:6px;"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-small" style="flex:1;border-color:#93c5fd;color:#1d4ed8;" onclick="document.getElementById('debours-file-input').removeAttribute('capture');document.getElementById('debours-file-input').click()">📎 Choisir un PDF</button>
+            <button class="btn-small" style="flex:1;border-color:#93c5fd;color:#1d4ed8;" onclick="document.getElementById('debours-file-input').setAttribute('capture','environment');document.getElementById('debours-file-input').click()">📷 Prendre une photo</button>
+          </div>
+        </div>
+        <button class="btn-primary" style="width:100%;" onclick="ajouterDebours()">+ Enregistrer</button>
+      </div>
+    </div>
+
+    <!-- ARROSAGE CHANTIER -->
+    <div class="sub-content" id="sub-arrosage-ch">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Plantes achetées pour ce chantier, en attente de plantation</div>
+      <div id="chantier-arrosage-list"></div>
+      <div style="margin-top:12px;background:#dbeafe;border:1.5px dashed #93c5fd;border-radius:12px;padding:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:8px;">+ Ajouter une plante</div>
+        <div class="form-group" style="margin-bottom:8px;"><input type="text" class="form-input" id="arr-nom" placeholder="Nom de la plante (ex: Rosier, Thuya…)"></div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <div><label class="form-label">Fréquence d'arrosage</label>
+            <select class="form-select" id="arr-freq">
+              <option value="1">Tous les jours</option>
+              <option value="2" selected>Tous les 2 jours</option>
+              <option value="3">Tous les 3 jours</option>
+              <option value="7">1× par semaine</option>
+            </select>
+          </div>
+          <div><label class="form-label">Date d'achat</label><input type="date" class="form-input" id="arr-date"></div>
+        </div>
+        <button class="btn-primary" style="width:100%;" onclick="ajouterArrosage()">+ Ajouter la plante</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAUX -->
+<div class="modal-overlay" id="modal-taux">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header green"><h2>💶 Taux horaire</h2><button class="modal-close" onclick="closeModal('modal-taux')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nom du taux</label><input type="text" class="form-input" id="ft-nom" placeholder="ex: Jardinage, Bricolage, Urgence…"></div>
+      <div class="form-group"><label class="form-label">Tarif à l'heure (€)</label><input type="number" class="form-input" id="ft-tarif" placeholder="ex: 35"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1;" onclick="saveTaux()">💾 Enregistrer</button>
+        <button class="btn-secondary" onclick="closeModal('modal-taux')">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FREQ ARROSAGE (depuis liste achats) -->
+<div class="modal-overlay" id="modal-freq-arrosage" style="z-index:300;">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header green"><h2>💧 Fréquence d'arrosage</h2><button class="modal-close" onclick="closeModal('modal-freq-arrosage')">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:14px;margin-bottom:14px;">Plante détectée : <strong id="freq-plante-nom"></strong></div>
+      <div class="form-group"><label class="form-label">À arroser tous les…</label>
+        <select class="form-select" id="freq-arrosage-select">
+          <option value="1">Chaque jour</option>
+          <option value="2" selected>Tous les 2 jours</option>
+          <option value="3">Tous les 3 jours</option>
+          <option value="7">1 fois par semaine</option>
+        </select>
+      </div>
+      <button class="btn-primary" style="width:100%;" onclick="confirmerFreqArrosage()">✅ Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL STOCK MATOS -->
+<div class="modal-overlay" id="modal-matos-stock">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header green"><h2>🧰 Ajouter au stock</h2><button class="modal-close" onclick="closeModal('modal-matos-stock')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nom du matériel</label><input type="text" class="form-input" id="fms-nom" placeholder="ex: Tronçonneuse, Râteau…"></div>
+      <div class="form-group"><label class="form-label">Catégorie</label>
+        <select class="form-select" id="fms-cat">
+          <option value="jardinage">🌿 Jardinage</option>
+          <option value="bricolage">🔧 Bricolage</option>
+          <option value="commun">🔗 Commun</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Quantité en stock <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label>
+        <input type="text" class="form-input" id="fms-qte" placeholder="ex: 2, 1 jeu, 3m²…">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1;" onclick="saveMatosStockItem()">💾 Enregistrer</button>
+        <button class="btn-secondary" onclick="closeModal('modal-matos-stock')">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ALIMS À CHARGER -->
+<div class="modal-overlay" id="modal-alims">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header" style="background:#d97706;">
+      <h2>🔌 Alims à charger</h2>
+      <button class="modal-close" onclick="closeModal('modal-alims')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Liste des alimentations à charger pour ce chantier</div>
+      <div id="alims-liste-modale"></div>
+      <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--soft);margin-bottom:8px;">+ Ajouter une alim</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Choisis un emoji et un nom :</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;" id="alim-ico-picker">
+          🔋🪛🔌🪚🔧⚡🪝🔦🎛️🪜
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="alim-ico-custom" placeholder="ou tape un emoji" maxlength="4" style="width:70px;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-size:18px;text-align:center;">
+          <input type="text" id="alim-label" placeholder="Nom (ex: Perceuse, Tronç…)" style="flex:1;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <button class="btn-primary" style="width:100%;background:#d97706;" onclick="ajouterAlim()">+ Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════
+// DONNÉES
+// ════════════════════════════════════
+let clients    = [];
+let matosStock = [];
+let taux       = [];
+let config     = {};
+let currentClientId    = null;
+let currentChantierIdx = null;
+let editClientId       = null;
+// Débours reçu en cours d'ajout (avant enregistrement)
+let _pendingRecuData = null;
+let _pendingRecuNom  = null;
+let _pendingRecuType = null;
+
+function uidGen(){ return '_' + Date.now() + Math.random().toString(36).slice(2,7); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function today(){ return new Date().toISOString().slice(0,10); }
+
+// ── load ──
+function loadAll(){
+  try{ clients    = JSON.parse(localStorage.getItem('clientsData')    ||'[]'); }catch(e){ clients=[]; }
+  try{ matosStock = JSON.parse(localStorage.getItem('matosStockData') ||'[]'); }catch(e){ matosStock=[]; }
+  try{ taux       = JSON.parse(localStorage.getItem('tauxData')       ||'[]'); }catch(e){ taux=[]; }
+  try{ config     = JSON.parse(localStorage.getItem('clientsConfig')  ||'{}'); }catch(e){ config={}; }
+}
+
+// ── save ──
+let _localDirty=false, _dirtyTimer=null;
+function saveClients(){
+  _localDirty=true;
+  clearTimeout(_dirtyTimer);
+  _dirtyTimer=setTimeout(()=>{ _localDirty=false; },4000);
+  localStorage.setItem('clientsData', JSON.stringify(clients));
+  syncFirestore();
+  syncGlobalCourses();
+}
+function saveMatosData(){ localStorage.setItem('matosStockData', JSON.stringify(matosStock)); syncFirestore(); }
+function saveTauxData() { localStorage.setItem('tauxData',       JSON.stringify(taux));       syncFirestore(); }
+function saveConfigData(){ localStorage.setItem('clientsConfig', JSON.stringify(config));     syncFirestore(); }
+
+// ════════════════════════════════════
+// FIREBASE SYNC
+// ════════════════════════════════════
+window._initSync = function(uid) {
+  loadAll(); renderAll(); fillConfigForm();
+  const { db, doc, onSnapshot } = window._fb;
+  const ref = doc(db, 'users', uid);
+  onSnapshot(ref, snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    if (d.clientsData && !_localDirty)    { try{ clients    = JSON.parse(d.clientsData);    localStorage.setItem('clientsData',d.clientsData);    }catch(e){} }
+    if (d.matosStockData) { try{ matosStock = JSON.parse(d.matosStockData); localStorage.setItem('matosStockData',d.matosStockData);}catch(e){} }
+    if (d.tauxData)       { try{ taux       = JSON.parse(d.tauxData);       localStorage.setItem('tauxData',d.tauxData);           }catch(e){} }
+    if (d.clientsConfig)  { try{ config     = JSON.parse(d.clientsConfig);  localStorage.setItem('clientsConfig',d.clientsConfig); }catch(e){} }
+    renderAll(); fillConfigForm();
+    if (currentChantierIdx !== null) {
+      const ch = getCurrentChantier();
+      if (ch) { renderChantierMatos(ch); populateMatosStockSugg(); }
+    }
+  });
+  window._pushFirestore = async () => {
+    try {
+      const { setDoc } = window._fb;
+      var payload = {
+        clientsData:    JSON.stringify(clients),
+        matosStockData: JSON.stringify(matosStock),
+        tauxData:       JSON.stringify(taux),
+        clientsConfig:  JSON.stringify(config),
+      };
+      // Inclure plannerTodos si présent dans localStorage
+      var todos = localStorage.getItem('plannerTodos');
+      if(todos) payload.plannerTodos = todos;
+      await setDoc(ref, payload, { merge: true });
+    } catch(e){ console.warn('Firebase write', e); }
+  };
+};
+let _syncTimer = null;
+function syncFirestore(){ clearTimeout(_syncTimer); _syncTimer = setTimeout(() => window._pushFirestore && window._pushFirestore(), 800); }
+
+// REÇUS DÉBOURS dans sous-collection Firebase
+// Sous-collections photos — séparées du document principal pour éviter limite 1MB
+function photoDebRef(uid, rid){
+  var fb=window._fb;
+  return fb.doc(fb.db,'users',uid,'photos_debours',String(rid));
+}
+function photoLbcRef(uid, rid){
+  var fb=window._fb;
+  return fb.doc(fb.db,'users',uid,'photos_lbc',String(rid));
+}
+function _compressImageClients(base64, type, callback){
+  var img=new Image();
+  img.onload=function(){
+    var TARGET=650000, ratio=img.height/img.width, maxSize=800;
+    var w=img.width>img.height?maxSize:Math.round(maxSize/ratio);
+    var h=Math.round(w*ratio);
+    var canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+    var result, quality=0.65, attempts=0;
+    do {
+      canvas.width=w; canvas.height=h;
+      ctx.clearRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      result=canvas.toDataURL('image/jpeg',quality);
+      if(result.length>TARGET){ w=Math.round(w*.8); h=Math.round(w*ratio); quality=Math.max(quality-.05,.2); }
+      attempts++;
+    } while(result.length>TARGET && attempts<8);
+    callback(result);
+  };
+  img.onerror=function(){ callback(base64); };
+  img.src=base64;
+}
+
+function _compressImage(base64, type, callback){
+  var img = new Image();
+  img.onload = function(){
+    var TARGET = 650000, ratio = img.height/img.width, maxSize = 800;
+    var w = img.width > img.height ? maxSize : Math.round(maxSize/ratio);
+    var h = Math.round(w * ratio);
+    var canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+    var result, quality = 0.65, attempts = 0;
+    do {
+      canvas.width = w; canvas.height = h;
+      ctx.clearRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      result = canvas.toDataURL('image/jpeg', quality);
+      if (result.length > TARGET){ w = Math.round(w*.8); h = Math.round(w*ratio); quality = Math.max(quality-.05,.2); }
+      attempts++;
+    } while(result.length > TARGET && attempts < 8);
+    callback(result);
+  };
+  img.onerror = function(){ callback(base64); };
+  img.src = base64;
+}
+
+function addDeboursFile(input){
+  var files=Array.from(input.files); if(!files.length) return;
+  var file=files[0];
+  var isImage=file.type.startsWith('image/');
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var base64=e.target.result;
+    function onReady(data){
+      _pendingRecuData=data;
+      _pendingRecuNom=file.name;
+      _pendingRecuType=isImage?'image/jpeg':file.type;
+      var prev=document.getElementById('debours-recu-preview');
+      if(prev){
+        if(isImage){
+          prev.innerHTML='<img src="'+data+'" style="max-height:80px;border-radius:6px;margin-bottom:4px;"><br><span style="font-size:11px;color:var(--green);">✅ '+esc(file.name)+'</span>';
+        } else {
+          prev.innerHTML='<span style="font-size:12px;color:var(--green);">📄 '+esc(file.name)+'</span>';
+        }
+      }
+    }
+    if(isImage) _compressImageClients(base64,file.type,onReady); else onReady(base64);
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+// ════════════════════════════════════
+// SYNC COURSES GLOBAL
+// ════════════════════════════════════
+async function syncGlobalCourses(){
+  if(!window._fb || !window._currentUser) return;
+  try {
+    const { db, doc, getDoc, setDoc } = window._fb;
+    const ref = doc(db, 'users', window._currentUser.uid);
+    const snap = await getDoc(ref);
+    let coursesData = [];
+    if(snap.exists() && snap.data().coursesData){ try{ coursesData = JSON.parse(snap.data().coursesData); }catch(e){} }
+    coursesData.forEach(mag => { mag.items = (mag.items||[]).filter(i => i._source !== 'clients'); });
+    clients.forEach(client => {
+      (client.chantiers||[]).forEach(ch => {
+        (ch.courses||[]).forEach(course => {
+          if(!course.article) return;
+          const nomMag = course.magasin || 'Divers';
+          let mag = coursesData.find(m => m.name.toLowerCase() === nomMag.toLowerCase());
+          if(!mag){ mag = { id: 'mag_cl_'+uidGen(), name: nomMag, items: [] }; coursesData.push(mag); }
+          const label = course.qte ? course.article+' ('+course.qte+')' : course.article;
+          mag.items.push({ id:'cl_'+course.id, text: label+' — 🌿 '+client.nom+(ch.nom?' / '+ch.nom:''), checked:false, separator:false, _source:'clients' });
+        });
+      });
+    });
+    coursesData = coursesData.filter(m => (m.items||[]).length > 0 || !String(m.id).startsWith('mag_cl_'));
+    await setDoc(ref, { coursesData: JSON.stringify(coursesData) }, { merge: true });
+  } catch(e){ console.warn('Sync courses', e); }
+}
+
+// ════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════
+function switchMain(tab){
+  document.querySelectorAll('.main-tab').forEach((b,i) => { const tabs=['clients','arrosage','matos-stock','config']; b.classList.toggle('active', tabs[i]===tab); });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-'+tab).classList.add('active');
+  const btnAdd = document.getElementById('btn-add');
+  if(tab==='clients'){ btnAdd.style.display=''; btnAdd.onclick=openModalClient; }
+  else btnAdd.style.display='none';
+  if(tab==='arrosage') renderArrosageGlobal();
+  if(tab==='matos-stock') renderMatosStock();
+  if(tab==='config'){ renderTaux(); fillConfigForm(); }
+}
+
+function switchSub(tab){
+  document.querySelectorAll('.sub-tab').forEach((b,i) => { const tabs=['matos','courses','devis','debours','arrosage-ch']; b.classList.toggle('active', tabs[i]===tab); });
+  document.querySelectorAll('.sub-content').forEach(s => s.classList.remove('active'));
+  document.getElementById('sub-'+tab).classList.add('active');
+  const ch = getCurrentChantier();
+  if(!ch) return;
+  if(tab==='matos')       { renderChantierMatos(ch); populateMatosStockSugg(); }
+  if(tab==='courses')     { renderChantierCourses(ch); populateMagasinSugg(); }
+  if(tab==='devis')       renderDevis(ch);
+  if(tab==='debours')     renderDebours(ch);
+  if(tab==='arrosage-ch') renderChantierArrosage(ch);
+}
+
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if(id==='modal-chantier') document.getElementById('chantier-suppr-confirm').style.display='none';
+}
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function renderAll(){ renderClientsList(); }
+
+// ════════════════════════════════════
+// CLIENTS
+// ════════════════════════════════════
+function renderClientsList(){
+  const container = document.getElementById('clients-list');
+  if(clients.length===0){ container.innerHTML='<div class="empty-state"><div class="ico">👥</div><p>Aucun client — clique sur + !</p></div>'; return; }
+  container.innerHTML = clients.map(c => {
+    const nb = (c.chantiers||[]).length;
+    const nbArr = (c.chantiers||[]).reduce((s,ch)=>s+(ch.arrosages||[]).filter(a=>!a.plante).length,0);
+    return '<div class="client-card" onclick="openDetailClient(\''+c.id+'\')"><div class="client-card-header"><div class="client-avatar">'+(c.nom||'?')[0].toUpperCase()+'</div><div class="client-infos"><div class="client-nom">'+esc(c.nom)+'</div><div class="client-detail">'+esc(c.adresse||'')+(c.tel?(c.adresse?' · ':'')+c.tel:'')+'</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><span class="pill pill-green">'+nb+' chantier'+(nb!==1?'s':'')+'</span>'+(nbArr>0?'<span class="pill pill-blue">💧 '+nbArr+' plante'+(nbArr>1?'s':'')+'</span>':'')+'</div></div></div>';
+  }).join('');
+}
+
+function openModalClient(){
+  editClientId=null;
+  document.getElementById('modal-client-titre').textContent='👤 Nouveau client';
+  ['fc-nom','fc-adresse','fc-tel','fc-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fc-suppr-zone').style.display='none';
+  document.getElementById('fc-suppr-confirm').style.display='none';
+  openModal('modal-client');
+}
+
+function editClient(){
+  const c = clients.find(x=>x.id===currentClientId); if(!c) return;
+  editClientId=c.id;
+  document.getElementById('modal-client-titre').textContent='✏️ Modifier client';
+  document.getElementById('fc-nom').value=c.nom||'';
+  document.getElementById('fc-adresse').value=c.adresse||'';
+  document.getElementById('fc-tel').value=c.tel||'';
+  document.getElementById('fc-notes').value=c.notes||'';
+  document.getElementById('fc-suppr-zone').style.display='';
+  document.getElementById('fc-suppr-confirm').style.display='none';
+  openModal('modal-client');
+}
+
+function saveClient(){
+  const nom=document.getElementById('fc-nom').value.trim(); if(!nom){ alert('Le nom est obligatoire !'); return; }
+  const data={ nom, adresse:document.getElementById('fc-adresse').value.trim(), tel:document.getElementById('fc-tel').value.trim(), notes:document.getElementById('fc-notes').value.trim() };
+  if(editClientId){ const c=clients.find(x=>x.id===editClientId); if(c) Object.assign(c,data); }
+  else clients.push({ id:uidGen(), ...data, chantiers:[] });
+  saveClients(); renderClientsList(); closeModal('modal-client');
+  if(editClientId) openDetailClient(editClientId);
+}
+
+function confirmerSuppClient(){
+  clients=clients.filter(c=>c.id!==editClientId); saveClients(); renderClientsList();
+  closeModal('modal-client'); closeModal('modal-detail-client');
+}
+
+function openDetailClient(id){
+  currentClientId=id;
+  const c=clients.find(x=>x.id===id); if(!c) return;
+  document.getElementById('detail-client-titre').textContent='👤 '+c.nom;
+  document.getElementById('detail-client-infos').innerHTML=[c.adresse,c.tel,c.notes].filter(Boolean).map(s=>esc(s)).join(' &nbsp;·&nbsp; ')||'<em>Aucune info</em>';
+  renderChantiersList(c); openModal('modal-detail-client');
+}
+
+// ════════════════════════════════════
+// CHANTIERS
+// ════════════════════════════════════
+function getClient(){ return clients.find(x=>x.id===currentClientId); }
+function getCurrentChantier(){ const c=getClient(); if(!c||currentChantierIdx===null) return null; return (c.chantiers||[])[currentChantierIdx]||null; }
+
+function renderChantiersList(c){
+  const container=document.getElementById('chantiers-list');
+  const ch=c.chantiers||[];
+  if(ch.length===0){ container.innerHTML='<div class="empty-state" style="padding:30px 20px;"><div class="ico" style="font-size:36px;">🏗️</div><p style="font-size:13px;">Aucun chantier</p></div>'; return; }
+  container.innerHTML=ch.map((ch,idx)=>{
+    const m=ch.matos||[], done=m.filter(x=>x.coche).length, pct=m.length>0?Math.round(done/m.length*100):0;
+    const ico={jardinage:'🌿',bricolage:'🔧',mixte:'🌿🔧'}[ch.type]||'🏗️';
+    return '<div class="chantier-card" onclick="openModalChantier('+idx+')"><div class="chantier-header"><div><div class="chantier-nom">'+ico+' '+esc(ch.nom||'Chantier sans nom')+'</div><div style="font-size:12px;color:var(--soft);">'+m.length+' matos · '+(ch.courses||[]).length+' achat(s)'+(ch.arrosages&&ch.arrosages.length?' · 💧 '+ch.arrosages.filter(a=>!a.plante).length+' plante(s)':'')+'</div></div><div style="font-size:13px;font-weight:700;color:var(--green);">'+pct+'%</div></div>'+(m.length>0?'<div style="padding:0 14px 10px;"><div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div></div>':'')+'</div>';
+  }).join('');
+}
+
+function openModalChantier(idx){
+  const c=getClient(); if(!c) return;
+  currentChantierIdx=idx;
+  const isNew=idx===null;
+  document.getElementById('btn-suppr-chantier').style.display=isNew?'none':'';
+  document.getElementById('chantier-suppr-confirm').style.display='none';
+  if(isNew){
+    document.getElementById('fch-nom').value='';
+    document.getElementById('fch-type').value='jardinage';
+    if(!c.chantiers) c.chantiers=[];
+    c.chantiers.push({ id:uidGen(), nom:'', type:'jardinage', matos:[], courses:[], debours:[], arrosages:[] });
+    currentChantierIdx=c.chantiers.length-1;
+    saveClients();
+  } else {
+    const ch=c.chantiers[idx];
+    document.getElementById('fch-nom').value=ch.nom||'';
+    document.getElementById('fch-type').value=ch.type||'jardinage';
+  }
+  document.getElementById('modal-chantier-titre').textContent='🏗️ '+(getCurrentChantier()?.nom||'Nouveau chantier');
+  document.querySelectorAll('.sub-tab').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.querySelectorAll('.sub-content').forEach((s,i)=>s.classList.toggle('active',i===0));
+  const ch=getCurrentChantier();
+  renderChantierMatos(ch); populateMatosStockSugg(); populateMagasinSugg();
+  openModal('modal-chantier');
+}
+
+function autoSaveChantierNom(){
+  const ch=getCurrentChantier(); if(!ch) return;
+  ch.nom=document.getElementById('fch-nom').value.trim()||'Chantier sans nom';
+  ch.type=document.getElementById('fch-type').value;
+  document.getElementById('modal-chantier-titre').textContent='🏗️ '+ch.nom;
+  const c=getClient(); saveClients(); if(c) renderChantiersList(c);
+}
+
+function demanderSuppChantier(){ document.getElementById('chantier-suppr-confirm').style.display=''; }
+function confirmerSuppChantier(){
+  const c=getClient(); if(!c) return;
+  const ch=c.chantiers[currentChantierIdx];
+  // Supprimer les todos d'arrosage créées pour ce chantier
+  if(ch && ch.arrosages && ch.arrosages.length>0){
+    try{
+      var todos=JSON.parse(localStorage.getItem('plannerTodos')||'{}');
+      var nomsPlantes=ch.arrosages.map(function(a){ return a.nom; });
+      Object.keys(todos).forEach(function(date){
+        todos[date]=(todos[date]||[]).filter(function(t){
+          if(!t._arrosage) return true;
+          return !nomsPlantes.some(function(nom){ return t.text && t.text.includes(nom); });
+        });
+      });
+      localStorage.setItem('plannerTodos', JSON.stringify(todos));
+      // Pousser vers Firebase
+      if(window._fb && window._currentUser){
+        const {db,doc,setDoc}=window._fb;
+        setDoc(doc(db,'users',window._currentUser.uid),{plannerTodos:JSON.stringify(todos)},{merge:true})
+          .catch(function(e){console.warn('push plannerTodos',e);});
+      }
+    }catch(e){ console.warn('cleanup todos',e); }
+  }
+  c.chantiers.splice(currentChantierIdx,1); currentChantierIdx=null;
+  saveClients(); renderChantiersList(c); closeModal('modal-chantier');
+}
+
+// ════════════════════════════════════
+// MATOS CHANTIER
+// ════════════════════════════════════
+function renderChantierMatos(ch){
+  if(!ch) return;
+  const m=ch.matos||[], done=m.filter(x=>x.coche).length, pct=m.length>0?Math.round(done/m.length*100):0;
+  document.getElementById('chantier-matos-list').innerHTML=m.length===0
+    ?'<p style="text-align:center;color:var(--muted);font-size:13px;padding:16px 0;">Aucun matériel</p>'
+    :m.map((item,i)=>'<div class="matos-item"><div class="matos-check '+(item.coche?'done':'')+'" onclick="toggleMatos('+i+')">'+(item.coche?'✓':'')+'</div><div class="matos-label '+(item.coche?'done':'')+'">'+esc(item.nom)+'</div>'+(item.qte?'<div style="font-size:12px;color:var(--muted);">'+esc(item.qte)+'</div>':'')+'<button class="btn-icon" onclick="suppMatos('+i+')">×</button></div>').join('');
+  // Inclure les alims dans le calcul du %
+  var alims=ch.alimsCharger||[];
+  var alimsTotal=alims.length;
+  var alimsCoches=alims.filter(function(a){return a.charge;}).length;
+  var totalItems=m.length+alimsTotal;
+  var totalCoches=done+alimsCoches;
+  var pctGlobal=totalItems>0?Math.round(totalCoches/totalItems*100):pct;
+  document.getElementById('matos-progress-fill').style.width=pctGlobal+'%';
+  document.getElementById('matos-progress-pct').textContent=pctGlobal===100?'🎉 Tout est prêt !':pctGlobal+'%';
+  // Alims à charger
+  renderAlimsCharger(ch);
+}
+
+function renderAlimsCharger(ch){
+  var el=document.getElementById('alims-charger-section'); if(!el) return;
+  var alims=ch.alimsCharger||[];
+  if(alims.length===0){ el.innerHTML=''; return; }
+  var coches=alims.filter(function(a){return a.charge;}).length;
+  el.innerHTML='<div style="background:#fefce8;border:1.5px solid #fcd34d;border-radius:12px;padding:12px;margin-top:10px;">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+      '<span style="font-size:13px;font-weight:800;color:#b45309;">🔌 Alims à charger</span>'+
+      '<span style="font-size:12px;color:#92400e;">'+coches+'/'+alims.length+'</span>'+
+      '<button onclick="resetAlimsCharger()" style="background:none;border:none;cursor:pointer;font-size:13px;color:#dc262666;margin-left:auto;" title="Tout décocher">↺</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+    alims.map(function(a,i){
+      return '<button onclick="toggleAlim('+i+')" title="'+esc(a.label)+'" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border:1.5px solid '+(a.charge?'#f59e0b':'#fcd34d')+';border-radius:10px;background:'+(a.charge?'#fef3c7':'white')+';cursor:pointer;font-size:11px;color:#92400e;font-weight:600;">'+
+        '<span style="font-size:22px;opacity:'+(a.charge?'1':'0.4')+'">'+a.ico+'</span>'+
+        '<span style="white-space:nowrap;">'+esc(a.label)+'</span>'+
+        (a.charge?'<span style="font-size:9px;color:#16a34a;font-weight:800;">✓ CHARGE</span>':'<span style="font-size:9px;color:#d97706;">à charger</span>')+
+      '</button>';
+    }).join('')+
+    '</div></div>';
+}
+
+function toggleAlim(idx){
+  var ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.alimsCharger) return;
+  ch.alimsCharger[idx].charge=!ch.alimsCharger[idx].charge;
+  saveClients(); renderAlimsCharger(ch);
+}
+
+var _selectedAlimIco='🔋';
+function openModalAjoutAlim(){
+  var ch=getCurrentChantier(); if(!ch) return;
+  // Remplir la liste des alims existantes
+  renderAlimsListeModale(ch);
+  // Configurer le picker d'icônes
+  var picker=document.getElementById('alim-ico-picker');
+  if(picker){
+    var icos=['🔋','🪛','🔌','🪚','🔧','⚡','🪝','🔦','🎛️','🪜'];
+      picker.innerHTML=icos.map(function(ico){
+        return '<button data-ico="'+ico+'" onclick="selectAlimIco(this)" style="font-size:22px;padding:4px 6px;border:2px solid '+(ico===_selectedAlimIco?'#d97706':'var(--line)')+';border-radius:8px;background:'+(ico===_selectedAlimIco?'#fef3c7':'white')+';cursor:pointer;">'+ico+'</button>';
+    }).join('');
+  }
+  document.getElementById('alim-label').value='';
+  document.getElementById('alim-ico-custom').value='';
+  openModal('modal-alims');
+}
+
+function selectAlimIco(btn){
+  var ico=btn.dataset.ico||btn.textContent.trim();
+  _selectedAlimIco=ico;
+  document.querySelectorAll('#alim-ico-picker button').forEach(function(b){
+    b.style.borderColor=b.textContent.trim()===ico?'#d97706':'var(--line)';
+    b.style.background=b.textContent.trim()===ico?'#fef3c7':'white';
+  });
+}
+
+function renderAlimsListeModale(ch){
+  var el=document.getElementById('alims-liste-modale'); if(!el) return;
+  var alims=ch.alimsCharger||[];
+  if(alims.length===0){ el.innerHTML='<p style="font-size:13px;color:var(--muted);text-align:center;padding:8px 0;">Aucune alim pour ce chantier</p>'; return; }
+  el.innerHTML=alims.map(function(a,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);">'+
+      '<span style="font-size:20px;">'+a.ico+'</span>'+
+      '<span style="flex:1;font-size:14px;">'+esc(a.label)+'</span>'+
+      '<button onclick="supprimerAlim('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;">×</button>'+
+    '</div>';
+  }).join('');
+}
+
+function ajouterAlim(){
+  var ch=getCurrentChantier(); if(!ch) return;
+  var icoCustom=(document.getElementById('alim-ico-custom').value||'').trim();
+  var ico=icoCustom||_selectedAlimIco||'🔋';
+  var label=(document.getElementById('alim-label').value||'').trim();
+  if(!label){ alert('Donne un nom a l\'alim !'); return; }
+  if(!ch.alimsCharger) ch.alimsCharger=[];
+  ch.alimsCharger.push({ id:uidGen(), ico, label, charge:false });
+  document.getElementById('alim-label').value='';
+  document.getElementById('alim-ico-custom').value='';
+  saveClients(); renderAlimsCharger(ch); renderAlimsListeModale(ch);
+}
+
+function supprimerAlim(idx){
+  var ch=getCurrentChantier(); if(!ch) return;
+  ch.alimsCharger.splice(idx,1);
+  saveClients(); renderAlimsCharger(ch); renderAlimsListeModale(ch);
+}
+
+function resetAlimsCharger(){
+  var ch=getCurrentChantier(); if(!ch) return;
+  (ch.alimsCharger||[]).forEach(function(a){a.charge=false;});
+  saveClients(); renderAlimsCharger(ch);
+}
+
+function toggleMatos(idx){
+  const ch=getCurrentChantier(); if(!ch) return;
+  ch.matos[idx].coche=!ch.matos[idx].coche;
+  saveClients(); renderChantierMatos(ch); renderChantiersList(getClient());
+}
+
+function ajouterMatos(){
+  const nom=document.getElementById('matos-article').value.trim(); if(!nom){ alert('Écris le matériel !'); return; }
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.matos) ch.matos=[];
+  ch.matos.push({ id:uidGen(), nom, qte:document.getElementById('matos-qte').value.trim(), coche:false });
+  document.getElementById('matos-article').value=''; document.getElementById('matos-qte').value='';
+  saveClients(); renderChantierMatos(ch);
+}
+
+function suppMatos(idx){
+  const ch=getCurrentChantier(); if(!ch) return;
+  ch.matos.splice(idx,1); saveClients(); renderChantierMatos(ch);
+}
+
+function toggleStockPanel(){
+  const panel=document.getElementById('stock-panel');
+  if(panel.style.display==='none'){ panel.style.display=''; renderStockPanel(); }
+  else panel.style.display='none';
+}
+
+function renderStockPanel(){
+  const panel=document.getElementById('stock-panel-list');
+  if(!panel) return;
+  const ch=getCurrentChantier();
+  const dejaDans=new Set((ch&&ch.matos||[]).map(m=>m.nom.toLowerCase()));
+  if(matosStock.length===0){ panel.innerHTML="<p style='font-size:13px;color:#a8a29e;'>Stock vide</p>"; return; }
+  const groups={jardinage:'🌿',bricolage:'🔧',commun:'🔗'};
+  panel.innerHTML=Object.entries(groups).map(([cat,ico])=>{
+    const items=matosStock.filter(m=>m.cat===cat);
+    if(!items.length) return '';
+    return '<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--soft);margin-bottom:4px;">'+ico+' '+cat.charAt(0).toUpperCase()+cat.slice(1)+'</div>'+
+      items.map(function(m){
+        var already=dejaDans.has(m.nom.toLowerCase());
+        var iid='s'+m.id.replace(/[^a-z0-9]/gi,'');
+        var stockInfo=m.qteStock?' <small style="color:#a8a29e;">(stock: '+m.qteStock+')</small>':'';
+        var html='<div style="padding:6px 0;border-bottom:1px solid rgba(22,163,74,.1);">';
+        html+='<div style="display:flex;align-items:center;gap:6px;">';
+        html+='<span style="flex:1;font-size:13px;'+(already?'color:#a8a29e;':'')+'">'+esc(m.nom)+stockInfo+'</span>';
+        html+='</div>';
+        if(already){
+          html+='<div style="font-size:11px;color:var(--green);margin-top:2px;">✓ deja dans la liste</div>';
+        } else {
+          html+='<div style="display:flex;gap:6px;margin-top:5px;align-items:center;">';
+          html+='<input type="text" id="'+iid+'" placeholder="Qte (ex: 2, 1 bidon)" style="flex:1;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">';
+          html+='<button onclick="ajouterDepuisStockAvecQte(this.dataset.nom,\''+iid+'\')" data-nom="'+esc(m.nom)+'" style="background:var(--green);color:white;border:none;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">+ Ajouter</button>';
+          html+='</div>';
+        }
+        html+='</div>';
+        return html;
+      }).join('')+'</div>';
+  }).join('');
+}
+
+function ajouterDepuisStock(nom){ ajouterDepuisStockAvecQte(nom, null); }
+
+function ajouterDepuisStockAvecQte(nom, inputId){
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.matos) ch.matos=[];
+  if(ch.matos.some(m=>m.nom.toLowerCase()===nom.toLowerCase())){ 
+    alert(nom+' est deja dans la liste !'); return; 
+  }
+  var qte='';
+  if(inputId){
+    var el=document.getElementById(inputId);
+    if(el) qte=el.value.trim();
+  }
+  ch.matos.push({ id:uidGen(), nom, qte, coche:false });
+  saveClients(); renderChantierMatos(ch); renderStockPanel();
+}
+
+function populateMatosStockSugg(){} // conservé pour compatibilité
+
+// ════════════════════════════════════
+// COURSES CHANTIER
+// ════════════════════════════════════
+function renderChantierCourses(ch){
+  if(!ch) return;
+  const courses=ch.courses||[];
+  if(courses.length===0){ document.getElementById('chantier-courses-list').innerHTML='<p style="text-align:center;color:var(--muted);font-size:13px;padding:16px 0;">Aucun article</p>'; return; }
+  const grouped={};
+  courses.forEach(c=>{ const m=c.magasin||'Divers'; if(!grouped[m]) grouped[m]=[]; grouped[m].push(c); });
+  document.getElementById('chantier-courses-list').innerHTML=Object.entries(grouped).map(([mag,items])=>
+    '<div class="magasin-section"><div class="magasin-title">🛒 '+esc(mag)+' <span style="font-size:11px;color:var(--muted);">'+items.length+' article'+(items.length>1?'s':'')+'</span></div>'+
+        items.map(function(c){ return '<div class="course-row" style="flex-wrap:wrap;"><span style="flex:1;min-width:100px;">'+esc(c.article)+(c.qte?' <span style="color:var(--muted);">x '+esc(c.qte)+'</span>':'')+'</span>'+'<input type="number" placeholder="Prix EUR" value="'+(c.prix||'')+'" min="0" step="0.01" data-id="'+c.id+'" onchange="majPrixCourse(this)" style="width:72px;padding:3px 6px;border:1px solid #e7e5e4;border-radius:6px;font-size:12px;text-align:right;" title="Prix">'+'<button class="btn-icon" onclick="suppCourse(\''+c.id+'\')" >x</button></div>'; }).join('')+
+    '</div>'
+  ).join('');
+}
+
+function populateMagasinSugg(){
+  try{
+    const cd=JSON.parse(localStorage.getItem('coursesData')||'[]');
+    const dl=document.getElementById('magasins-sugg');
+    if(dl) dl.innerHTML=cd.map(m=>'<option value="'+esc(m.name)+'">').join('');
+  }catch(e){}
+}
+
+function ajouterCourse(){
+  const article=document.getElementById('course-article').value.trim();
+  const magasin=document.getElementById('course-magasin').value.trim();
+  const qte=document.getElementById('course-qte').value.trim();
+  if(!article){ alert('Écris l\'article !'); return; }
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.courses) ch.courses=[];
+  const newCourse={ id:uidGen(), article, magasin:magasin||'Divers', qte };
+  ch.courses.push(newCourse);
+
+  document.getElementById('course-article').value='';
+  document.getElementById('course-qte').value='';
+  saveClients(); renderChantierCourses(ch);
+
+  // ── Détection automatique "plante NomPlante" ──
+  const lc = article.toLowerCase();
+  if(lc.startsWith('plante ')){
+    const nomPlante = article.slice(7).trim();
+    if(nomPlante){
+      // Ouvrir la modale de fréquence
+      window._pendingPlante = { nom: nomPlante, chantierIdx: currentChantierIdx, clientId: currentClientId };
+      document.getElementById('freq-plante-nom').textContent = nomPlante;
+      document.getElementById('freq-arrosage-select').value = '2';
+      openModal('modal-freq-arrosage');
+    }
+  }
+}
+
+function confirmerFreqArrosage(){
+  const p = window._pendingPlante; if(!p) return;
+  closeModal('modal-freq-arrosage');
+  // Retrouver le chantier
+  const c = clients.find(x=>x.id===p.clientId); if(!c) return;
+  const ch = c.chantiers[p.chantierIdx]; if(!ch) return;
+  const freq = document.getElementById('freq-arrosage-select').value;
+  if(!ch.arrosages) ch.arrosages=[];
+  ch.arrosages.push({ id:uidGen(), nom:p.nom, freq, dateAchat:today(), dernierArrosage:today(), plante:false });
+  addArrosageTodos(p.nom, freq);
+  saveClients();
+  // Rafraîchir si on est sur ce chantier
+  if(currentChantierIdx===p.chantierIdx && currentClientId===p.clientId) renderChantierArrosage(ch);
+  window._pendingPlante = null;
+}
+
+function suppCourse(cid){
+  const ch=getCurrentChantier(); if(!ch) return;
+  ch.courses=(ch.courses||[]).filter(c=>c.id!==cid);
+  saveClients(); renderChantierCourses(ch);
+}
+
+function majPrixCourse(input){
+  const cid=input.dataset.id;
+  const ch=getCurrentChantier(); if(!ch) return;
+  const course=(ch.courses||[]).find(c=>c.id===cid);
+  if(course){ course.prix=input.value; saveClients(); }
+}
+
+function ajouterFraisDevis(){
+  const label=document.getElementById('dv-frais-label').value.trim();
+  const montant=parseFloat(document.getElementById('dv-frais-montant').value)||0;
+  if(!label||!montant){ alert('Remplis la description et le montant !'); return; }
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.devis) ch.devis={};
+  if(!ch.devis.fraisListe) ch.devis.fraisListe=[];
+  ch.devis.fraisListe.push({ id:uidGen(), label, montant });
+  document.getElementById('dv-frais-label').value='';
+  document.getElementById('dv-frais-montant').value='';
+  saveClients(); renderDevis(ch);
+}
+
+function supprimerFraisDevis(idx){
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.devis||!ch.devis.fraisListe) return;
+  ch.devis.fraisListe.splice(idx,1);
+  saveClients(); renderDevis(ch);
+}
+
+// ── Ajouter les todos d'arrosage dans le planificateur ──
+function addArrosageTodos(nomPlante, freq){
+  try{
+    const freqN=parseInt(freq)||2;
+    const today_=new Date();
+    // Trouver le prochain lundi
+    const dayOfWeek=today_.getDay();
+    const daysUntilMonday=dayOfWeek===1?7:(8-dayOfWeek)%7||7;
+    const nextMonday=new Date(today_);
+    nextMonday.setDate(today_.getDate()+daysUntilMonday);
+
+    let plannerTodos={};
+    try{ plannerTodos=JSON.parse(localStorage.getItem('plannerTodos')||'{}'); }catch(e){}
+
+    // Ajouter une todo d'arrosage tous les N jours jusqu'au prochain lundi
+    let d=new Date(today_);
+    d.setDate(d.getDate()+freqN); // commence dans freq jours
+    while(d<=nextMonday){
+      const ds=d.toISOString().slice(0,10);
+      if(!plannerTodos[ds]) plannerTodos[ds]=[];
+      // Éviter doublons
+      const already=plannerTodos[ds].some(t=>t.text&&t.text.includes('Arroser '+nomPlante));
+      if(!already) plannerTodos[ds].push({ id:uidGen(), text:'💧 Arroser '+nomPlante, completed:false, created:new Date().toISOString(), _arrosage:true });
+      d.setDate(d.getDate()+freqN);
+    }
+    localStorage.setItem('plannerTodos', JSON.stringify(plannerTodos));
+    // Pousser vers Firebase via la clé plannerTodos si possible
+    syncFirestore();
+  }catch(e){ console.warn('addArrosageTodos', e); }
+}
+
+// ════════════════════════════════════
+// DEVIS + EXPORT PDF
+// ════════════════════════════════════
+function renderDevis(ch){
+  if(!ch) return;
+  const dv=ch.devis||{};
+  const tauxOptions=taux.map(t=>'<option value="'+t.id+'" '+(dv.tauxId===t.id?'selected':'')+'>'+esc(t.nom)+' — '+t.tarif+'€/h</option>').join('');
+  const tarifH=parseFloat(dv.tauxLibre)||0;
+  const nbJournees=parseInt(dv.nbJournees)||0;
+  const nbDemiJ=parseInt(dv.nbDemiJournees)||0;
+  const nbH=nbJournees*6+nbDemiJ*3;
+  const totalMO=tarifH*nbH;
+  const totalFraisListe=(dv.fraisListe||[]).reduce((s,f)=>s+parseFloat(f.montant||0),0);
+  const totalAchats=(ch.courses||[]).filter(c=>c.prix&&parseFloat(c.prix)>0).reduce((s,c)=>s+parseFloat(c.prix||0),0);
+  const total=totalMO+totalFraisListe+totalAchats;
+
+  document.getElementById('devis-content').innerHTML=`
+    <div class="devis-block">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--green);">✏️ Rédiger le devis</div>
+      <div class="form-group"><label class="form-label">Description des travaux</label>
+        <textarea class="form-textarea" id="dv-desc" rows="3" placeholder="Décrivez les travaux…" oninput="saveDevisField('description',this.value)">${esc(dv.description||'')}</textarea>
+      </div>
+      <div class="form-row" style="margin-bottom:8px;">
+        <div>
+          <label class="form-label">Journées (6h)</label>
+          <input type="number" class="form-input" id="dv-nb-journees" min="0" step="1" placeholder="0" value="${dv.nbJournees||0}" oninput="saveDevisField('nbJournees',parseInt(this.value)||0);renderDevis(getCurrentChantier())" style="text-align:center;">
+        </div>
+        <div>
+          <label class="form-label">Demi-journées (3h)</label>
+          <input type="number" class="form-input" id="dv-nb-demijournees" min="0" step="1" placeholder="0" value="${dv.nbDemiJournees||0}" oninput="saveDevisField('nbDemiJournees',parseInt(this.value)||0);renderDevis(getCurrentChantier())" style="text-align:center;">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Taux horaire (€/h)</label>
+        <input type="number" class="form-input" id="dv-taux-libre" min="0" placeholder="ex: 35" value="${dv.tauxLibre||''}" oninput="saveDevisField('tauxLibre',parseFloat(this.value)||0);renderDevis(getCurrentChantier())">
+      </div>
+
+      <!-- Achats depuis liste courses -->
+      ${(()=>{const courses=ch.courses||[];const avecPrix=courses.filter(c=>c.prix&&parseFloat(c.prix)>0);const total=avecPrix.reduce((s,c)=>s+parseFloat(c.prix||0),0);return avecPrix.length>0?`<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;"><div style="font-weight:700;color:var(--green);margin-bottom:4px;">🛒 Achats (depuis liste d'achats)</div>${avecPrix.map(c=>`<div style="display:flex;justify-content:space-between;color:var(--soft);"><span>${esc(c.article)}</span><span>${parseFloat(c.prix).toFixed(2)}€</span></div>`).join('')}<div style="border-top:1px solid #86efac;margin-top:4px;padding-top:4px;font-weight:700;display:flex;justify-content:space-between;"><span>Total achats</span><span>${total.toFixed(2)}€</span></div></div>`:'';})()}
+      <!-- Frais supplémentaires dynamiques -->
+      <div style="background:#f8fafc;border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--soft);margin-bottom:8px;">💸 FRAIS SUPPLÉMENTAIRES</div>
+        ${(dv.fraisListe||[]).map((f,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><span style="flex:1;font-size:13px;">${esc(f.label)}</span><span style="font-weight:700;color:var(--amber);white-space:nowrap;">${parseFloat(f.montant||0).toFixed(2)}€</span><button onclick="supprimerFraisDevis(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 4px;">×</button></div>`).join('')}
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <input type="text" id="dv-frais-label" placeholder="Description (ex: Déplacement, Location…)" style="flex:1;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+          <input type="number" id="dv-frais-montant" placeholder="€" min="0" style="width:70px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+          <button onclick="ajouterFraisDevis()" style="background:var(--green);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">+</button>
+        </div>
+      </div>
+      ${total>0||totalMO>0?`<div style="background:var(--green-light);border-radius:10px;padding:12px;margin-bottom:12px;font-size:13px;">
+        ${nbJournees>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>${nbJournees} journée(s) × 6h × ${tarifH}€/h</span><strong>${(nbJournees*6*tarifH).toFixed(0)}€</strong></div>`:''}
+        ${nbDemiJ>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>${nbDemiJ} demi-journée(s) × 3h × ${tarifH}€/h</span><strong>${(nbDemiJ*3*tarifH).toFixed(0)}€</strong></div>`:''}
+        ${totalMO>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;border-top:1px solid var(--green-border);padding-top:4px;"><span><strong>Sous-total main d'oeuvre</strong></span><strong>${totalMO.toFixed(0)}€</strong></div>`:''}
+        ${totalAchats>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>🛒 Achats</span><strong>${totalAchats.toFixed(2)}€</strong></div>`:''}
+        ${(dv.fraisListe||[]).map(f=>`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>${esc(f.label)}</span><strong>${parseFloat(f.montant||0).toFixed(2)}€</strong></div>`).join('')}
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--green-border);margin-top:4px;padding-top:6px;font-weight:700;font-size:15px;"><span>TOTAL</span><span style="color:var(--green);">${total.toFixed(2)}€</span></div>
+      </div>`:''}
+      <div style="display:flex;gap:8px;">
+        <button class="btn-primary" style="flex:1;" onclick="genererDevis()">📋 Générer</button>
+        ${dv.genere?'<button onclick="exportPDF()" style="background:#2563eb;color:white;border:none;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">📥 PDF</button>':''}
+      </div>
+    </div>
+    ${dv.genere?`<div class="devis-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-weight:700;color:var(--green);">📄 Devis généré</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="copierDevis()" style="background:var(--green);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">📋 Copier</button>
+          <button onclick="exportPDF()" style="background:var(--blue);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">📥 PDF</button>
+        </div>
+      </div>
+      <div class="devis-preview" id="devis-preview-text">${esc(dv.genere)}</div>
+    </div>`:''}
+  `;
+}
+
+function saveDevisField(field,value){
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.devis) ch.devis={};
+  ch.devis[field]=value; saveClients();
+}
+
+function genererDevis(){
+  const ch=getCurrentChantier(), c=getClient(); if(!ch||!c) return;
+  const dv=ch.devis||{};
+  const tarifH2=parseFloat(dv.tauxLibre)||0;
+  const nbJournees2=parseInt(dv.nbJournees)||0;
+  const nbDemiJ2=parseInt(dv.nbDemiJournees)||0;
+  const nbH=nbJournees2*6+nbDemiJ2*3;
+  const totalMO=tarifH2*nbH;
+  const fraisAchats2=parseFloat(dv.fraisAchats)||0;
+  const fraisDepl2=parseFloat(dv.fraisDeplacement)||0;
+  const fraisAutres2=parseFloat(dv.fraisAutres)||0;
+  const totalFrais2=fraisAchats2+fraisDepl2+fraisAutres2;
+  const debList=ch.debours||[];
+  const totalDeb=debList.reduce((s,d)=>s+parseFloat(d.montant||0),0);
+  const total=totalMO+totalFrais2+totalDeb;
+  const dateStr=new Date().toLocaleDateString('fr-FR');
+  const nDevis='DEV-'+Date.now().toString().slice(-6);
+
+  let t='';
+  t+='DEVIS N° '+nDevis+'\n'+'-'.repeat(40)+'\n';
+  t+='Date : '+dateStr+'\n';
+  if(config.nom)   t+='Prestataire : '+config.nom+'\n';
+  if(config.siret) t+='SIRET : '+config.siret+'\n';
+  if(config.tel)   t+='Tél : '+config.tel+'\n';
+  if(config.email) t+='Email : '+config.email+'\n';
+  t+='\nClient : '+c.nom+'\n';
+  if(c.adresse) t+='Adresse : '+c.adresse+'\n';
+  t+='\nChantier : '+(ch.nom||'—')+'\n'+'-'.repeat(40)+'\n\n';
+  if(dv.description) t+='DESCRIPTION DES TRAVAUX\n'+dv.description+'\n\n';
+  if((ch.courses||[]).length>0){
+    t+='FOURNITURES PRÉVUES\n';
+    const grp={};
+    ch.courses.forEach(co=>{ const m=co.magasin||'Divers'; if(!grp[m]) grp[m]=[]; grp[m].push(co); });
+    Object.entries(grp).forEach(([mag,items])=>{ t+='  '+mag+' :\n'; items.forEach(co=>{ t+='    - '+co.article+(co.qte?' ('+co.qte+')':'')+'\n'; }); });
+    t+='\n';
+  }
+  t+='TARIFICATION\n';
+  if((nbJournees2>0||nbDemiJ2>0)&&tarifH2>0){
+    if(nbJournees2>0) t+='  '+nbJournees2+' journee(s) x 6h x '+tarifH2+'e/h = '+(nbJournees2*6*tarifH2).toFixed(0)+'e\n';
+    if(nbDemiJ2>0)    t+='  '+nbDemiJ2+' demi-journee(s) x 3h x '+tarifH2+'e/h = '+(nbDemiJ2*3*tarifH2).toFixed(0)+'e\n';
+    if(totalMO>0) t+='  Sous-total main-d oeuvre : '+totalMO.toFixed(0)+'e\n';
+  }
+  const achats2=(ch.courses||[]).filter(function(c){return c.prix&&parseFloat(c.prix)>0;});
+  if(achats2.length>0){
+    t+='\nACHATS / FOURNITURES\n';
+    achats2.forEach(function(c){ t+='  - '+(c.article||'')+(c.qte?' ('+c.qte+')':'')+ ' : '+parseFloat(c.prix||0).toFixed(2)+'e\n'; });
+    t+='  Sous-total achats : '+achats2.reduce(function(s,c){return s+parseFloat(c.prix||0);},0).toFixed(2)+'e\n';
+  }
+  const fraisListe2=(dv.fraisListe||[]);
+  if(fraisListe2.length>0){
+    t+='\nFRAIS SUPPLEMENTAIRES\n';
+    fraisListe2.forEach(function(f){ t+='  - '+(f.label||'')+' : '+parseFloat(f.montant||0).toFixed(2)+'e\n'; });
+  }
+  if(debList.length>0){ t+='  Débours :\n'; debList.forEach(d=>{ t+='    - '+d.description+' : '+parseFloat(d.montant||0).toFixed(2)+'€\n'; }); t+='  Total débours : '+totalDeb.toFixed(2)+'€\n'; }
+  const totalGen2=totalMO+achats2.reduce(function(s,c){return s+parseFloat(c.prix||0);},0)+fraisListe2.reduce(function(s,f){return s+parseFloat(f.montant||0);},0);
+  t+='\n'+'-'.repeat(40)+'\nTOTAL : '+totalGen2.toFixed(2)+'e\n'+'-'.repeat(40)+'\n\n';
+  if(config.mention) t+=config.mention+'\n\n';
+  t+='Signature client : ___________________\n\n';
+  if(config.nom) t+=config.nom+'\n';
+  if(config.siret) t+='SIRET : '+config.siret;
+
+  if(!ch.devis) ch.devis={};
+  ch.devis.genere=t; ch.devis.nDevis=nDevis;
+  saveClients(); renderDevis(ch);
+}
+
+function exportDeboursPDF(){
+  var ch=getCurrentChantier(), c=getClient(); if(!ch||!c) return;
+  var list=ch.debours||[];
+  if(list.length===0){ alert('Aucune depense enregistree !'); return; }
+  if(!window.jspdf){ alert('jsPDF non charge, recharge la page !'); return; }
+
+  var total=list.reduce(function(s,d){ return s+parseFloat(d.montant||0); },0);
+  var dateStr=new Date().toLocaleDateString('fr-FR');
+
+  function nPDF(s){
+    var map={'—':'-','–':'-','’':"'",'é':'e','è':'e','ê':'e',
+      'à':'a','â':'a','î':'i','ô':'o','ù':'u','û':'u',
+      'ç':'c','É':'E','À':'A','Ç':'C','œ':'oe','ë':'e'};
+    return s.split('').map(function(c){ return map[c]||(c.charCodeAt(0)<=255?c:'?'); }).join('');
+  }
+
+  // Étape 1 : collecter tous les justificatifs (avec leurs données)
+  var recusACharger=[];
+  list.forEach(function(d){
+    if(d.recuData) recusACharger.push({data:d.recuData,type:d.recuType||'image/jpeg',desc:d.description});
+    else if(d.recuId) recusACharger.push({recuId:d.recuId,type:d.recuType||'image/jpeg',desc:d.description});
+  });
+
+  // Étape 2 : résoudre les Firebase et convertir en images canvas
+  function resolveAll(items, done){
+    var resolved=[];
+    if(items.length===0){ done(resolved); return; }
+    var pending=items.length;
+    items.forEach(function(item, idx){
+      function processData(base64, type){
+        // Convertir en image canvas
+        var img=new Image();
+        img.onload=function(){
+          var canvas=document.createElement('canvas');
+          var MAX=1600;
+          var scale=Math.min(MAX/img.width, MAX/img.height, 1);
+          canvas.width=Math.round(img.width*scale);
+          canvas.height=Math.round(img.height*scale);
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          resolved[idx]={dataUrl:canvas.toDataURL('image/jpeg',0.85),w:canvas.width,h:canvas.height,desc:item.desc};
+          pending--; if(pending===0) done(resolved);
+        };
+        img.onerror=function(){
+          resolved[idx]=null; pending--; if(pending===0) done(resolved);
+        };
+        img.src=base64;
+      }
+      if(item.data){
+        processData(item.data, item.type);
+      } else if(item.recuId && window._currentUser){
+        window._fb.getDoc(photoDebRef(window._currentUser.uid,item.recuId))
+          .then(function(snap){
+            if(snap.exists()){ processData(snap.data().data, snap.data().type); }
+            else { resolved[idx]=null; pending--; if(pending===0) done(resolved); }
+          })
+          .catch(function(){ resolved[idx]=null; pending--; if(pending===0) done(resolved); });
+      } else {
+        resolved[idx]=null; pending--; if(pending===0) done(resolved);
+      }
+    });
+  }
+
+  // Debug : afficher ce qu'on a trouvé
+  console.log('Debours total:', list.length);
+  list.forEach(function(d,i){
+    console.log('Debour '+i+' :', d.description, '| recuData:', !!(d.recuData), '| recuId:', d.recuId||'none', '| recuType:', d.recuType||'none');
+  });
+  console.log('Recus a charger:', recusACharger.length);
+
+  // Étape 3 : construire le PDF une fois tout résolu
+  resolveAll(recusACharger, function(images){
+    console.log('Images resolues:', images.length, images.map(function(i){return i?'OK':'null';}));
+    var jsPDF=window.jspdf.jsPDF;
+    var pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    var W=210, M=16, H=297;
+    var y=M;
+
+    // En-tête
+    pdf.setFillColor(45,106,79); pdf.rect(0,0,W,30,'F');
+    pdf.setTextColor(255,255,255);
+    pdf.setFontSize(16); pdf.setFont('helvetica','bold');
+    pdf.text('NOTE DE DEBOURS',M,14);
+    pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+    pdf.text('Date : '+dateStr, M, 22);
+    if(config.nom) pdf.text(nPDF(config.nom), W-M, 20, {align:'right'});
+    if(config.siret) pdf.text('SIRET : '+config.siret, W-M, 26, {align:'right'});
+    y=38;
+
+    // Bloc client
+    pdf.setFillColor(240,253,244); pdf.rect(M,y,W-M*2,20,'F');
+    pdf.setDrawColor(134,239,172); pdf.rect(M,y,W-M*2,20);
+    pdf.setTextColor(28,25,23); pdf.setFontSize(10); pdf.setFont('helvetica','bold');
+    pdf.text(nPDF(c.nom||'-'), M+4, y+8);
+    if(c.adresse){ pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.text(nPDF(c.adresse), M+4, y+14); }
+    pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.setTextColor(45,106,79);
+    pdf.text('Chantier : '+nPDF(ch.nom||'-'), W/2, y+12, {align:'center'});
+    y+=26;
+
+    // Titre tableau
+    pdf.setFontSize(11); pdf.setFont('helvetica','bold'); pdf.setTextColor(45,106,79);
+    pdf.text('DETAIL DES DEPENSES', M, y); y+=5;
+
+    // Header
+    pdf.setFillColor(45,106,79); pdf.rect(M,y,W-M*2,7,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
+    pdf.text('N', M+2, y+5); pdf.text('Description', M+14, y+5);
+    pdf.text('Date', M+110, y+5); pdf.text('Montant', M+138, y+5); pdf.text('Justif.', M+160, y+5);
+    y+=7;
+
+    var numJustif=0;
+    list.forEach(function(d,i){
+      if(y>262){ pdf.addPage(); y=M; }
+      var mt=parseFloat(d.montant||0);
+      var hasRecu=!!(d.recuData||d.recuId);
+      if(hasRecu) numJustif++;
+      pdf.setFillColor(i%2===0?245:255, i%2===0?250:255, i%2===0?247:255);
+      pdf.rect(M,y,W-M*2,7,'F');
+      pdf.setDrawColor(200,200,200); pdf.rect(M,y,W-M*2,7);
+      pdf.setTextColor(28,25,23); pdf.setFontSize(8); pdf.setFont('helvetica','normal');
+      pdf.text(String(i+1), M+2, y+5);
+      pdf.text(nPDF(d.description||'-').substring(0,38), M+14, y+5);
+      pdf.text(d.date||'-', M+110, y+5);
+      pdf.text(mt.toFixed(2)+' EUR', M+138, y+5);
+      pdf.text(hasRecu?'oui':'-', M+160, y+5);
+      y+=7;
+    });
+
+    // Total
+    y+=4; if(y>262){ pdf.addPage(); y=M; }
+    pdf.setFillColor(6,95,70); pdf.rect(M,y,W-M*2,10,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(12); pdf.setFont('helvetica','bold');
+    pdf.text('TOTAL : '+total.toFixed(2)+' EUR', M+4, y+7);
+    y+=16;
+
+    // Signature
+    if(y>252){ pdf.addPage(); y=M; }
+    pdf.setTextColor(90,90,90); pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+    pdf.text('Signature :', M, y); pdf.line(M,y+12,M+55,y+12); y+=20;
+    if(config.nom){ pdf.setFontSize(8); pdf.text(nPDF(config.nom), M, y); y+=4; }
+    if(config.siret){ pdf.text('SIRET : '+config.siret, M, y); }
+
+    // Pages justificatifs
+    var jIdx=0;
+    images.forEach(function(img, i){
+      if(!img) return;
+      jIdx++;
+      pdf.addPage();
+      // En-tête page justificatif
+      pdf.setFillColor(45,106,79); pdf.rect(0,0,W,14,'F');
+      pdf.setTextColor(255,255,255); pdf.setFontSize(9); pdf.setFont('helvetica','bold');
+      pdf.text('Justificatif '+jIdx+' : '+nPDF(img.desc||'').substring(0,50), M, 9);
+      // Image centrée
+      var maxW=W-M*2, maxH=H-22-M;
+      var scale=Math.min(maxW/img.w, maxH/img.h);
+      var dw=img.w*scale, dh=img.h*scale;
+      var dx=(W-dw)/2;
+      try{ pdf.addImage(img.dataUrl,'JPEG',dx,16,dw,dh,'','FAST'); }
+      catch(e){ pdf.setTextColor(200,0,0); pdf.text('Erreur image',M,30); }
+    });
+
+    // Sauvegarder
+    var nom='note-debours-'+nPDF(c.nom||'client').replace(/\s+/g,'-')+'.pdf';
+    pdf.save(nom);
+  });
+}
+
+function copierDevis(){
+  const el=document.getElementById('devis-preview-text'); if(!el) return;
+  navigator.clipboard.writeText(el.textContent).then(()=>{
+    const btn=document.querySelector('[onclick="copierDevis()"]');
+    if(btn){ const o=btn.textContent; btn.textContent='✅ Copié !'; setTimeout(()=>btn.textContent=o,2000); }
+  });
+}
+
+function exportPDF(){
+  const ch=getCurrentChantier(), c=getClient(); if(!ch||!c) return;
+  const texteRaw=(ch.devis&&ch.devis.genere)||'';
+  if(!texteRaw){ alert('Génère le devis d\'abord !'); return; }
+  // Nettoyer les caractères pour jsPDF helvetica (Latin1 uniquement)
+  const texte = (function(s){
+    var map = {
+      '─':'-','━':'-','═':'-','—':'-','–':'-',
+      '“':'"','”':'"','«':'"','»':'"',
+      '‘':"'",'’':"'",
+      'à':'a','á':'a','â':'a','ã':'a','ä':'a','å':'a',
+      'é':'e','è':'e','ê':'e','ë':'e',
+      'î':'i','ï':'i',
+      'ô':'o','ö':'o',
+      'ù':'u','û':'u','ü':'u',
+      'ç':'c','œ':'oe',
+      'À':'A','Â':'A','É':'E','È':'E','Ê':'E',
+      'Î':'I','Ï':'I','Ô':'O','Ö':'O',
+      'Ù':'U','Û':'U','Ü':'U','Ç':'C','Œ':'Oe'
+    };
+    return s.split('').map(function(c){
+      if(map[c]) return map[c];
+      var code=c.charCodeAt(0);
+      return code<=255 ? c : '?';
+    }).join('');
+  })(texteRaw);
+  if(!window.jspdf){ alert('jsPDF non charge, recharge la page !'); return; }
+  try{
+    var jsPDF=window.jspdf.jsPDF;
+    var pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(11);
+    var lines=pdf.splitTextToSize(texte,175);
+    var y=20;
+    lines.forEach(function(line){
+      if(y>270){ pdf.addPage(); y=20; }
+      pdf.text(line,17,y); y+=6;
+    });
+    var nom=(ch.devis&&ch.devis.nDevis)||'devis';
+    pdf.save('devis-'+nom+'.pdf');
+  }catch(e){ alert('Erreur PDF : '+e.message); }
+}
+
+// ════════════════════════════════════
+// DÉBOURS
+// ════════════════════════════════════
+function renderDebours(ch){
+  if(!ch) return;
+  const list=ch.debours||[];
+  const total=list.reduce((s,d)=>s+parseFloat(d.montant||0),0);
+  document.getElementById('debours-list').innerHTML=list.length===0
+    ?'<p style="text-align:center;color:var(--muted);font-size:13px;padding:16px 0;">Aucune dépense</p>'
+    :'<div style="margin-bottom:10px;">'+list.map((d,i)=>`<div class="debours-item">
+        <div style="flex:1;"><div style="font-weight:600;">${esc(d.description)}</div>${d.date?'<div style="font-size:11px;color:var(--muted);">'+d.date+'</div>':''}</div>
+        <div style="font-weight:700;color:var(--amber);margin-right:8px;">${parseFloat(d.montant||0).toFixed(2)}€</div>
+        '+((d.recuData||d.recuId)?'<button onclick="voirRecu('+i+')" style="background:#eff6ff;border:1px solid #93c5fd;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;color:#1d4ed8;">📎 Voir</button>':'')+
+        <button class="btn-icon" onclick="suppDebours(${i})">×</button>
+      </div>`).join('')+
+    '<div style="padding:10px 0;font-weight:700;font-size:15px;border-top:2px solid var(--line);color:var(--amber);">Total avancé : '+total.toFixed(2)+'€</div></div>';
+}
+
+function ajouterDebours(){
+  const desc=document.getElementById('deb-desc').value.trim();
+  const montant=document.getElementById('deb-montant').value;
+  if(!desc||!montant){ alert('Remplis la description et le montant !'); return; }
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.debours) ch.debours=[];
+  const deb={ id:uidGen(), description:desc, montant, date:document.getElementById('deb-date').value };
+
+  // Upload photo vers sous-collection Firebase (pas dans le document principal)
+  if(_pendingRecuData && window._currentUser){
+    var rid='dr_'+uidGen();
+    deb.recuId=rid;
+    deb.recuNom=_pendingRecuNom;
+    deb.recuType=_pendingRecuType;
+    var finalData=_pendingRecuData;
+    window._fb.setDoc(photoDebRef(window._currentUser.uid, rid), {
+      data: finalData, nom: _pendingRecuNom, type: _pendingRecuType
+    }).catch(function(e){ console.warn('Upload photo debours',e); });
+  }
+
+  ch.debours.push(deb);
+  // Reset
+  document.getElementById('deb-desc').value=''; document.getElementById('deb-montant').value=''; document.getElementById('deb-date').value='';
+  _pendingRecuData=null; _pendingRecuNom=null; _pendingRecuType=null;
+  const prev=document.getElementById('debours-recu-preview'); if(prev) prev.innerHTML='';
+  saveClients(); renderDebours(ch);
+}
+
+function suppDebours(idx){
+  const ch=getCurrentChantier(); if(!ch) return;
+  ch.debours.splice(idx,1); saveClients(); renderDebours(ch);
+}
+
+function voirRecu(debIdx){
+  var ch=getCurrentChantier(); if(!ch) return;
+  var deb=ch.debours[debIdx]; if(!deb) return;
+  if(deb.recuData){
+    _afficherRecu(deb.recuData, deb.recuType);
+  } else if(deb.recuId && window._currentUser){
+    window._fb.getDoc(photoDebRef(window._currentUser.uid, deb.recuId)).then(function(snap){
+      if(!snap.exists()){ alert('Recu introuvable'); return; }
+      _afficherRecu(snap.data().data, snap.data().type);
+    }).catch(function(e){ alert('Erreur: '+e.message); });
+  }
+}
+
+function _afficherRecu(data, type){
+  if(type&&type.startsWith('image/')){
+    var w=window.open('','_blank');
+    w.document.write('<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+data+'" style="max-width:100%;max-height:100vh;"></body></html>');
+  } else {
+    var b64=data.split(',')[1];
+    var binary=atob(b64);
+    var bytes=new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    window.open(URL.createObjectURL(new Blob([bytes],{type:type||'application/pdf'})),'_blank');
+  }
+}
+
+// ════════════════════════════════════
+// ARROSAGE
+// ════════════════════════════════════
+function joursDepuis(dateStr){ if(!dateStr) return 0; return Math.floor((Date.now()-new Date(dateStr).getTime())/86400000); }
+
+function arrosageStatut(a){
+  if(a.plante) return {label:'🌱 Plantée',cls:'done'};
+  const freq=parseInt(a.freq||2), j=joursDepuis(a.dernierArrosage||a.dateAchat);
+  if(j>=freq) return {label:'💧 À arroser ! (J+'+j+')',cls:'urgent'};
+  return {label:'⏳ Dans '+(freq-j)+'j',cls:''};
+}
+
+function renderChantierArrosage(ch){
+  if(!ch) return;
+  const list=ch.arrosages||[];
+  const container=document.getElementById('chantier-arrosage-list');
+  container.innerHTML=list.length===0
+    ?'<p style="text-align:center;color:var(--muted);font-size:13px;padding:16px 0;">Aucune plante</p>'
+    :list.map((a,i)=>{
+      const s=arrosageStatut(a);
+      return '<div class="arrosage-card"><div style="font-size:28px;">🌱</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;">'+esc(a.nom)+'</div><div style="font-size:12px;color:var(--muted);">Tous les '+a.freq+'j · acheté le '+(a.dateAchat||'—')+'</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;"><span class="arrosage-alert '+s.cls+'">'+s.label+'</span>'
+        +(!a.plante?'<button onclick="arroserPlante('+i+')" style="background:#dbeafe;color:var(--blue);border:none;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">💧 Arrosée</button><button onclick="planterPlante('+i+')" style="background:var(--green-light);color:var(--green);border:none;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">🌱 Plantée</button>':'')
+        +'<button class="btn-icon" onclick="suppArrosage('+i+')">×</button></div></div>';
+    }).join('');
+}
+
+function ajouterArrosage(){
+  const nom=document.getElementById('arr-nom').value.trim(); if(!nom){ alert('Écris le nom de la plante !'); return; }
+  const ch=getCurrentChantier(); if(!ch) return;
+  if(!ch.arrosages) ch.arrosages=[];
+  const freq=document.getElementById('arr-freq').value;
+  const dateAchat=document.getElementById('arr-date').value||today();
+  ch.arrosages.push({ id:uidGen(), nom, freq, dateAchat, dernierArrosage:dateAchat, plante:false });
+  addArrosageTodos(nom, freq);
+  document.getElementById('arr-nom').value=''; document.getElementById('arr-date').value='';
+  saveClients(); renderChantierArrosage(ch);
+}
+
+function arroserPlante(idx){ const ch=getCurrentChantier(); if(!ch) return; ch.arrosages[idx].dernierArrosage=today(); saveClients(); renderChantierArrosage(ch); renderArrosageGlobal(); }
+function planterPlante(idx){ const ch=getCurrentChantier(); if(!ch) return; ch.arrosages[idx].plante=true; saveClients(); renderChantierArrosage(ch); renderArrosageGlobal(); }
+function suppArrosage(idx){ const ch=getCurrentChantier(); if(!ch) return; ch.arrosages.splice(idx,1); saveClients(); renderChantierArrosage(ch); }
+
+function renderArrosageGlobal(){
+  const container=document.getElementById('arrosage-list');
+  const all=[];
+  clients.forEach(c=>{
+    (c.chantiers||[]).forEach(ch=>{
+      (ch.arrosages||[]).forEach((a,i)=>{
+        if(!a.plante) all.push({...a, clientNom:c.nom, chantierNom:ch.nom, clientId:c.id, chantierIdx:(c.chantiers||[]).indexOf(ch), arrosageIdx:i});
+      });
+    });
+  });
+  if(all.length===0){ container.innerHTML='<div class="empty-state"><div class="ico">💧</div><p>Aucune plante en attente</p></div>'; return; }
+  all.sort((a,b)=>arrosageStatut(a).cls==='urgent'?-1:1);
+  container.innerHTML=all.map(a=>{
+    const s=arrosageStatut(a);
+    return '<div class="arrosage-card"><div style="font-size:28px;">🌱</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;">'+esc(a.nom)+'</div><div style="font-size:12px;color:var(--muted);">'+esc(a.clientNom)+' · '+esc(a.chantierNom||'—')+' · tous les '+a.freq+'j</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;"><span class="arrosage-alert '+s.cls+'">'+s.label+'</span><button onclick="arroserGlobal(\''+a.clientId+'\','+a.chantierIdx+','+a.arrosageIdx+')" style="background:#dbeafe;color:var(--blue);border:none;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">💧 Arrosée</button></div></div>';
+  }).join('');
+}
+
+function arroserGlobal(clientId,chIdx,aIdx){
+  const c=clients.find(x=>x.id===clientId); if(!c) return;
+  c.chantiers[chIdx].arrosages[aIdx].dernierArrosage=today();
+  saveClients(); renderArrosageGlobal();
+}
+
+// ════════════════════════════════════
+// STOCK MATOS
+// ════════════════════════════════════
+function renderMatosStock(){
+  const container=document.getElementById('matos-stock-list');
+  if(matosStock.length===0){ container.innerHTML='<div class="empty-state"><div class="ico">🧰</div><p>Stock vide</p></div>'; return; }
+  const groups={jardinage:'🌿 Jardinage',bricolage:'🔧 Bricolage',commun:'🔗 Commun'};
+  container.innerHTML=Object.entries(groups).map(([cat,label])=>{
+    const items=matosStock.filter(m=>m.cat===cat); if(items.length===0) return '';
+    return '<div style="background:white;border-radius:12px;border:1.5px solid var(--line);padding:12px;margin-bottom:10px;"><div style="font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px;">'+label+'</div>'+
+      items.map(m=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);"><span style="font-size:14px;">'+esc(m.nom)+'</span><button class="btn-icon" onclick="suppMatosStock(\''+m.id+'\')">×</button></div>').join('')+'</div>';
+  }).join('');
+}
+
+function openModalMatosStock(){ document.getElementById('fms-nom').value=''; document.getElementById('fms-cat').value='jardinage'; document.getElementById('fms-qte').value=''; openModal('modal-matos-stock'); }
+
+function saveMatosStockItem(){
+  const nom=document.getElementById('fms-nom').value.trim(); if(!nom){ alert('Écris le nom !'); return; }
+  matosStock.push({ id:uidGen(), nom, cat:document.getElementById('fms-cat').value, qteStock:document.getElementById('fms-qte').value.trim() });
+  saveMatosData(); renderMatosStock(); closeModal('modal-matos-stock'); populateMatosStockSugg();
+}
+
+function suppMatosStock(id){ matosStock=matosStock.filter(m=>m.id!==id); saveMatosData(); renderMatosStock(); populateMatosStockSugg(); }
+
+// ════════════════════════════════════
+// TAUX
+// ════════════════════════════════════
+function renderTaux(){
+  const container=document.getElementById('taux-list');
+  if(taux.length===0){ container.innerHTML='<p style="text-align:center;color:var(--muted);font-size:13px;padding:12px 0;">Aucun taux configuré</p>'; return; }
+  container.innerHTML=taux.map(t=>'<div class="taux-item"><div><div style="font-weight:700;">'+esc(t.nom)+'</div><div style="font-size:12px;color:var(--muted);">Demi-journée : '+(t.tarif*3).toFixed(0)+'€ · Journée : '+(t.tarif*6).toFixed(0)+'€</div></div><div style="display:flex;align-items:center;gap:8px;"><strong style="color:var(--green);">'+t.tarif+'€/h</strong><button class="btn-icon" onclick="suppTaux(\''+t.id+'\')">×</button></div></div>').join('');
+}
+
+function openModalTaux(){ document.getElementById('ft-nom').value=''; document.getElementById('ft-tarif').value=''; openModal('modal-taux'); }
+
+function saveTaux(){
+  const nom=document.getElementById('ft-nom').value.trim(), tarif=parseFloat(document.getElementById('ft-tarif').value);
+  if(!nom||!tarif){ alert('Remplis les champs !'); return; }
+  taux.push({ id:uidGen(), nom, tarif }); saveTauxData(); renderTaux(); closeModal('modal-taux');
+}
+
+function suppTaux(id){ taux=taux.filter(t=>t.id!==id); saveTauxData(); renderTaux(); }
+
+// ════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════
+function fillConfigForm(){
+  document.getElementById('config-nom').value   =config.nom||'';
+  document.getElementById('config-siret').value =config.siret||'';
+  document.getElementById('config-tel').value   =config.tel||'';
+  document.getElementById('config-email').value =config.email||'';
+  document.getElementById('config-mention').value=config.mention||'';
+}
+function saveConfig(){
+  config.nom    =document.getElementById('config-nom').value;
+  config.siret  =document.getElementById('config-siret').value;
+  config.tel    =document.getElementById('config-tel').value;
+  config.email  =document.getElementById('config-email').value;
+  config.mention=document.getElementById('config-mention').value;
+  saveConfigData();
+}
+
+// ════════════════════════════════════
+// INIT
+// ════════════════════════════════════
+loadAll();
+</script>
+</body>
+</html>
