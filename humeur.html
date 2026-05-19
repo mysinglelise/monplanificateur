@@ -2,22 +2,107 @@
 <html lang="fr">
 <head>
 <script>
-// ── Isolation multi-utilisateur : préfixe toutes les clés localStorage avec l'uid ──
-(function() {
-  // Vider __current_uid au démarrage — évite qu'un uid résiduel soit utilisé
-  // L'uid sera mis à jour par index.html via l'event storage après connexion
-  localStorage.removeItem('__current_uid');
-  var uid = '';
-  window._k = function(key) { return uid ? uid + '_' + key : key; };
-  // Recevoir l'uid depuis index.html quand l'utilisateur est connecté
-  window.addEventListener('storage', function(e) {
-    if (e.key === '__current_uid') {
-      uid = e.newValue || '';
-      window._k = function(key) { return uid ? uid + '_' + key : key; };
+// ── Isolation multi-utilisateur ───────────────────────────────
+localStorage.removeItem('__current_uid');
+var _uid = '';
+window._k = function(key) { return _uid ? _uid + '_' + key : key; };
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCnv0S78A8kK9vHHrzQKfYbX6NWM1UXRhs",
+    authDomain: "mon-planificateur-1e03c.firebaseapp.com",
+    projectId: "mon-planificateur-1e03c",
+    storageBucket: "mon-planificateur-1e03c.firebasestorage.app",
+    messagingSenderId: "978579425049",
+    appId: "1:978579425049:web:e53559ba2b80517c7c6788"
+  };
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  const SYNC_KEYS = ['humeurData'];
+
+  function userDocRef(uid) { return doc(db, 'users', uid); }
+
+  window._syncNow = function() {};
+  window._initFirestoreSync = function(uid) {
+    _uid = uid;
+    window._k = function(key) { return uid + '_' + key; };
+
+    // 1. Vider les anciennes données locales
+    SYNC_KEYS.forEach(function(k) { localStorage.removeItem(uid + '_' + k); });
+
+    // 2. Charger depuis Firebase
+    getDoc(userDocRef(uid)).then(function(snap) {
+      if (snap.exists()) {
+        var data = snap.data();
+        SYNC_KEYS.forEach(function(k) {
+          if (data[k]) localStorage.setItem(uid + '_' + k, data[k]);
+        });
+      }
+      // Afficher l'app après chargement
+      document.getElementById('app-humeur').style.display = 'block';
+      // Initialiser l'UI
+      var today = new Date().toISOString().slice(0,10);
+      document.getElementById('saisie-date').value = today;
+      prefillIfExists(today);
+    }).catch(function(e) {
+      console.error('Erreur chargement humeur:', e);
+      document.getElementById('app-humeur').style.display = 'block';
+    });
+
+    // 3. Sync push (debounced)
+    var _syncTimer = null;
+    window._syncNow = function() {
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(function() {
+        var data = {};
+        SYNC_KEYS.forEach(function(k) {
+          var v = localStorage.getItem(uid + '_' + k);
+          if (v) data[k] = v;
+        });
+        setDoc(userDocRef(uid), data, { merge: true })
+          .catch(function(e) { console.warn('sync humeur err', e); });
+      }, 1000);
+    };
+
+    // 4. Listener temps réel
+    onSnapshot(userDocRef(uid), function(snap) {
+      if (!snap.exists()) return;
+      var data = snap.data();
+      SYNC_KEYS.forEach(function(k) {
+        if (data[k] && data[k] !== localStorage.getItem(uid + '_' + k)) {
+          localStorage.setItem(uid + '_' + k, data[k]);
+          // Rafraîchir l'UI si l'onglet correspondant est actif
+          var t = document.querySelector('.tab.active');
+          if (t && t.textContent.includes('Journal')) renderHistorique();
+          if (t && t.textContent.includes('Année')) renderHeatmap();
+        }
+      });
+    });
+  };
+
+  onAuthStateChanged(auth, function(user) {
+    window._currentUser = user;
+    if (user) {
+      window._initFirestoreSync(user.uid);
+    } else {
+      window.location.href = 'index.html';
     }
   });
-})();
+
+  window._signOut = function() {
+    signOut(auth).then(function() { window.location.href = 'index.html'; });
+  };
 </script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Humeur & Énergie</title>
@@ -122,6 +207,10 @@
 </style>
 </head>
 <body>
+
+<div id="auth-loading" style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;font-size:15px;color:#888899;">⏳ Chargement...</div>
+
+<div id="app-humeur" style="display:none;">
 
 <div class="header">
   <h1>🌡️ Humeur & Énergie</h1>
@@ -239,17 +328,13 @@
 function loadData() { try { return JSON.parse(localStorage.getItem(_k('humeurData'))||'[]'); } catch(e){ return []; } }
 function saveData(d) {
   localStorage.setItem(_k('humeurData'), JSON.stringify(d));
-  try { window.parent&&window.parent._syncNow&&window.parent._syncNow(); } catch(e){}
+  window._syncNow && window._syncNow();
 }
 
 var state = { etat:null, energie:0, larmes:0, anx:0, moments:[], notes:'' };
 var heatmapYear = new Date().getFullYear();
 
-window.addEventListener('load', function() {
-  var today = new Date().toISOString().slice(0,10);
-  document.getElementById('saisie-date').value = today;
-  prefillIfExists(today);
-});
+// L'init date est maintenant dans _initFirestoreSync après chargement Firebase
 
 document.getElementById('saisie-date').addEventListener('change', function() {
   resetState(); prefillIfExists(this.value);
@@ -425,5 +510,7 @@ window.addEventListener('storage', function(e) {
   if (t&&t.textContent.includes('Année')) renderHeatmap();
 });
 </script>
+
+</div><!-- /app-humeur -->
 </body>
 </html>
