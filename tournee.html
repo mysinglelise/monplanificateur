@@ -415,16 +415,14 @@ window._initFirestoreSync = function(uid) {
                    'tourneeMatosCochage','plannerEvents'];
 
   // Vider le localStorage avant de charger — évite les résidus d'un autre utilisateur
-  var _orig = localStorage.__origSetItem || localStorage.setItem.bind(localStorage);
   SYNC_KEYS.forEach(function(k) { localStorage.removeItem(_k(k)); });
 
   // Charger les données Firebase depuis le document principal users/uid
-  var _origRef = _orig; // capturer _orig pour le callback async
   fb.getDoc(fb.doc(fb.db,'users',uid)).then(function(snap) {
     if (snap.exists()) {
       var data = snap.data();
       SYNC_KEYS.forEach(function(k) {
-        if (data[k]) _origRef(_k(k), data[k]); // écrire avec préfixe uid
+        if (data[k]) localStorage.setItem(_k(k), data[k]);
       });
       console.log('✅ Données tournée chargées depuis Firebase');
     }
@@ -3035,6 +3033,8 @@ async function _fillGommettePDF(PDFLib, f, recusList) {
   dt(grandTotal.toFixed(2)+' €', 505.0, 675.2);
   dt(f.signatureVille||'', 270.0, 693.4);
   dt(f.signatureDate||'',  270.0, 710.5);
+}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎭 Tournée</title>
@@ -3432,16 +3432,14 @@ window._initFirestoreSync = function(uid) {
                    'tourneeMatosCochage','plannerEvents'];
 
   // Vider le localStorage avant de charger — évite les résidus d'un autre utilisateur
-  var _orig = localStorage.__origSetItem || localStorage.setItem.bind(localStorage);
   SYNC_KEYS.forEach(function(k) { localStorage.removeItem(_k(k)); });
 
   // Charger les données Firebase depuis le document principal users/uid
-  var _origRef = _orig; // capturer _orig pour le callback async
   fb.getDoc(fb.doc(fb.db,'users',uid)).then(function(snap) {
     if (snap.exists()) {
       var data = snap.data();
       SYNC_KEYS.forEach(function(k) {
-        if (data[k]) _origRef(_k(k), data[k]); // écrire avec préfixe uid
+        if (data[k]) localStorage.setItem(_k(k), data[k]);
       });
       console.log('✅ Données tournée chargées depuis Firebase');
     }
