@@ -1,5 +1,5 @@
 // Service Worker pour PWA
-const CACHE_NAME = 'mon-planning-v62';
+const CACHE_NAME = 'mon-planning-v63';
 const BASE_PATH = '/monplanificateur';
 
 self.addEventListener('install', (event) => {
